@@ -828,8 +828,11 @@ AP_GPS_UBLOX::_parse_gps(void)
             }
             return false;
         case MSG_CFG_PRT:
-           _ublox_port = _buffer.prt.portID;
-           return false;
+            _ublox_port = _buffer.prt.portID;
+            if (!_protocols_configured) {
+                _configure_protocols();
+            }
+            return false;
         case MSG_CFG_RATE:
             if(_buffer.nav_rate.measure_rate_ms != gps._rate_ms[state.instance] ||
                _buffer.nav_rate.nav_rate != 1 ||
@@ -1037,6 +1040,7 @@ AP_GPS_UBLOX::_parse_gps(void)
             next_fix = AP_GPS::NO_FIX;
             state.status = AP_GPS::NO_FIX;
         }
+
 #if UBLOX_FAKE_3DLOCK
         state.status = AP_GPS::GPS_OK_FIX_3D;
         next_fix = state.status;
@@ -1520,6 +1524,29 @@ void
 AP_GPS_UBLOX::_request_version(void)
 {
     _send_message(CLASS_MON, MSG_MON_VER, nullptr, 0);
+}
+
+bool
+AP_GPS_UBLOX::_configure_protocols(void)
+{
+    if (port->txspace() < (int16_t)(sizeof(struct ubx_header)+sizeof(struct ubx_cfg_prt)+2)) {
+        Debug("UBX: Not enough TXSPACE to configure RTCM protocol");
+        return false;
+    }
+
+    // precondition: _buffer holds a CFG-PRT message that we have just retrieved
+    if (_class != CLASS_CFG || _msg_id != MSG_CFG_PRT) {
+        Debug("UBX: precondition violation in _configure_protocols()");
+        return false;
+    }
+
+    struct ubx_cfg_prt msg = _buffer.prt;
+    msg.inProtoMask |= 5;         // allow RTCM and UBX messages
+    _send_message(CLASS_CFG, MSG_CFG_PRT, &msg, sizeof(msg));
+
+    _protocols_configured = true;
+
+    return true;
 }
 
 void
