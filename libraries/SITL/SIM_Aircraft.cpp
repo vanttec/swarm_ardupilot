@@ -615,7 +615,7 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
 
     // constrain height to the ground
     if (on_ground()) {
-        if (!was_on_ground && AP_HAL::millis() - last_ground_contact_ms > 1000) {
+        if (!was_on_ground && AP_HAL::millis() - last_ground_contact_ms > 1000 && fabs(velocity_ef.z) > 0.02) {
             GCS_SEND_TEXT(MAV_SEVERITY_INFO, "SIM Hit ground at %f m/s", velocity_ef.z);
             last_ground_contact_ms = AP_HAL::millis();
         }
