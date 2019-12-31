@@ -322,7 +322,7 @@ void AC_PosControl::set_alt_target_from_climb_rate(float climb_rate_cms, float d
 ///     actual position target will be moved no faster than the speed_down and speed_up
 ///     target will also be stopped if the motors hit their limits or leash length is exceeded
 ///     set force_descend to true during landing to allow target to move low enough to slow the motors
-void AC_PosControl::set_alt_target_from_climb_rate_ff(float climb_rate_cms, float dt, bool force_descend)
+void AC_PosControl::set_alt_target_from_climb_rate_ff(float climb_rate_cms, float dt, bool force_descend, z_mode mode)
 {
     // calculated increased maximum acceleration if over speed
     float accel_z_cms = _accel_z_cms;
@@ -349,7 +349,14 @@ void AC_PosControl::set_alt_target_from_climb_rate_ff(float climb_rate_cms, floa
     // adjust desired alt if motors have not hit their limits
     // To-Do: add check of _limit.pos_down?
     if ((_vel_desired.z < 0 && (!_motors.limit.throttle_lower || force_descend)) || (_vel_desired.z > 0 && !_motors.limit.throttle_upper && !_limit.pos_up)) {
-        _pos_target.z += _vel_desired.z * dt;
+        // turn off position error compensation if we are in pure velocity
+        // feed forward control mode (should be used only with high speed
+        // external velocity z controller setting _vel_desired.z continuously
+        if (mode == Z_MODE_VEL_FF_ONLY) {
+            _pos_target.z = _inav.get_altitude();
+        } else {
+            _pos_target.z += _vel_desired.z * dt;
+        }
     }
 }
 
@@ -808,7 +815,7 @@ void AC_PosControl::standby_xyz_reset()
 }
 
 /// update_xy_controller - run the horizontal position controller - should be called at 100hz or higher
-void AC_PosControl::update_xy_controller()
+void AC_PosControl::update_xy_controller(xy_mode mode)
 {
     // compute dt
     const uint64_t now_us = AP_HAL::micros64();
@@ -826,7 +833,7 @@ void AC_PosControl::update_xy_controller()
     calc_leash_length_xy();
 
     // translate any adjustments from pilot to loiter target
-    desired_vel_to_pos(dt);
+    desired_vel_to_pos(dt, mode);
 
     // run horizontal position controller
     run_xy_controller(dt);
@@ -908,7 +915,7 @@ void AC_PosControl::init_vel_controller_xyz()
 ///     velocity targets should we set using set_desired_velocity_xy() method
 ///     callers should use get_roll() and get_pitch() methods and sent to the attitude controller
 ///     throttle targets will be sent directly to the motors
-void AC_PosControl::update_vel_controller_xy()
+void AC_PosControl::update_vel_controller_xy(xy_mode mode)
 {
     // capture time since last iteration
     const uint64_t now_us = AP_HAL::micros64();
@@ -927,7 +934,7 @@ void AC_PosControl::update_vel_controller_xy()
 
     // apply desired velocity request to position target
     // TODO: this will need to be removed and added to the calling function.
-    desired_vel_to_pos(dt);
+    desired_vel_to_pos(dt, mode);
 
     // run position controller
     run_xy_controller(dt);
@@ -940,12 +947,12 @@ void AC_PosControl::update_vel_controller_xy()
 ///     velocity targets should we set using set_desired_velocity_xyz() method
 ///     callers should use get_roll() and get_pitch() methods and sent to the attitude controller
 ///     throttle targets will be sent directly to the motors
-void AC_PosControl::update_vel_controller_xyz()
+void AC_PosControl::update_vel_controller_xyz(xy_mode mode_xy, z_mode mode_z)
 {
-    update_vel_controller_xy();
+    update_vel_controller_xy(mode_xy);
 
     // update altitude target
-    set_alt_target_from_climb_rate_ff(_vel_desired.z, _dt, false);
+    set_alt_target_from_climb_rate_ff(_vel_desired.z, _dt, false, mode_z);
 
     // run z-axis position controller
     update_z_controller();
@@ -989,7 +996,7 @@ void AC_PosControl::desired_accel_to_vel(float nav_dt)
 }
 
 /// desired_vel_to_pos - move position target using desired velocities
-void AC_PosControl::desired_vel_to_pos(float nav_dt)
+void AC_PosControl::desired_vel_to_pos(float nav_dt, xy_mode mode)
 {
     // range check nav_dt
     if (nav_dt < 0) {
@@ -1000,8 +1007,16 @@ void AC_PosControl::desired_vel_to_pos(float nav_dt)
     if (_flags.reset_desired_vel_to_pos) {
         _flags.reset_desired_vel_to_pos = false;
     } else {
-        _pos_target.x += _vel_desired.x * nav_dt;
-        _pos_target.y += _vel_desired.y * nav_dt;
+        // If no position error correction is used, we set _pos_target to
+        // current position
+        if (mode == XY_MODE_VEL_FF_ONLY) {
+           Vector3f curr_pos = _inav.get_position();
+           _pos_target.x = curr_pos.x;
+           _pos_target.y = curr_pos.y;
+        } else {
+            _pos_target.x += _vel_desired.x * nav_dt;
+            _pos_target.y += _vel_desired.y * nav_dt;
+        }
     }
 }
 
@@ -1017,6 +1032,13 @@ void AC_PosControl::run_xy_controller(float dt)
 
     Vector3f curr_pos = _inav.get_position();
     float kP = ekfNavVelGainScaler * _p_pos_xy.kP(); // scale gains to compensate for noisy optical flow measurement in the EKF
+
+    // Note that XY_MODE_VEL_FF_ONLY mode is used for instantaneous velocity
+    // control, without correction from integrative position error.
+    // In this case, at this point we expect that _pos_target equals to
+    // curr_pos, i.e., _pos_error and thus _vel_target is zero,
+    // i.e. that desired_vel_to_pos() was also called with this mode.
+    // In this case, we will use only the actual _vel_desired as FF.
 
     // avoid divide by zero
     if (kP <= 0.0f) {

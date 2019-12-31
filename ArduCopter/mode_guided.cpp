@@ -490,7 +490,8 @@ void ModeGuided::vel_control_run()
     }
 
     // call velocity controller which includes z axis controller
-    pos_control->update_vel_controller_xyz();
+    // we use instantaneous velocity control mode without pos correction
+    pos_control->update_vel_controller_xyz(AC_PosControl::XY_MODE_VEL_FF_ONLY, AC_PosControl::Z_MODE_VEL_FF_ONLY);
 
     // call attitude controller
     if (auto_yaw.mode() == AUTO_YAW_HOLD) {

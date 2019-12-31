@@ -42,7 +42,7 @@ void AC_PosControl_Sub::set_alt_target_from_climb_rate(float climb_rate_cms, flo
 ///     actual position target will be moved no faster than the speed_down and speed_up
 ///     target will also be stopped if the motors hit their limits or leash length is exceeded
 ///     set force_descend to true during landing to allow target to move low enough to slow the motors
-void AC_PosControl_Sub::set_alt_target_from_climb_rate_ff(float climb_rate_cms, float dt, bool force_descend)
+void AC_PosControl_Sub::set_alt_target_from_climb_rate_ff(float climb_rate_cms, float dt, bool force_descend, z_mode mode)
 {
     // calculated increased maximum acceleration if over speed
     float accel_z_cms = _accel_z_cms;
@@ -69,7 +69,14 @@ void AC_PosControl_Sub::set_alt_target_from_climb_rate_ff(float climb_rate_cms, 
     // adjust desired alt if motors have not hit their limits
     // To-Do: add check of _limit.pos_down?
     if ((_vel_desired.z<0 && (!_motors.limit.throttle_lower || force_descend)) || (_vel_desired.z>0 && !_motors.limit.throttle_upper && !_limit.pos_up)) {
-        _pos_target.z += _vel_desired.z * dt;
+        // turn off position error compensation if we are in pure velocity
+        // feed forward control mode (should be used only with high speed
+        // external velocity z controller setting _vel_desired.z continuously
+        if (mode == Z_MODE_VEL_FF_ONLY) {
+            _pos_target.z = _inav.get_altitude();
+        } else {
+            _pos_target.z += _vel_desired.z * dt;
+        }
     }
 
     // do not let target alt get above limit
