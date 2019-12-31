@@ -1541,7 +1541,7 @@ AP_GPS_UBLOX::_configure_protocols(void)
     }
 
     struct ubx_cfg_prt msg = _buffer.prt;
-    msg.inProtoMask |= 5;         // allow RTCM and UBX messages
+    msg.inProtoMask |= (1 + 4 + 32); // allow RTCM (4), UBX (1) and RTCM3 (32)
     _send_message(CLASS_CFG, MSG_CFG_PRT, &msg, sizeof(msg));
 
     _protocols_configured = true;
