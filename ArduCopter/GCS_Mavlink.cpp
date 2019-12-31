@@ -79,6 +79,11 @@ MAV_STATE GCS_MAVLINK_Copter::vehicle_system_status() const
         return MAV_STATE_CRITICAL;
     }
 
+    // set system as calibrating if the prearm checks have not passed yet
+    if (!copter.ap.pre_arm_check) {
+        return MAV_STATE_CALIBRATING;
+    }
+
     if (copter.ap.land_complete) {
         return MAV_STATE_STANDBY;
     }
