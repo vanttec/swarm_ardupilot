@@ -105,8 +105,8 @@ void ModeGuided::vel_control_start()
     pos_control->set_max_accel_xy(wp_nav->get_wp_acceleration());
 
     // initialize vertical speeds and acceleration
-    pos_control->set_max_speed_z(-get_pilot_speed_dn(), g.pilot_speed_up);
-    pos_control->set_max_accel_z(g.pilot_accel_z);
+    pos_control->set_max_speed_z(wp_nav->get_default_speed_down(), wp_nav->get_default_speed_up());
+    pos_control->set_max_accel_z(wp_nav->get_accel_z());
 
     // initialise velocity controller
     pos_control->init_vel_controller_xyz();
