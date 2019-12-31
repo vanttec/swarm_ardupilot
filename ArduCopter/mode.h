@@ -39,6 +39,7 @@ public:
         AUTOROTATE =   26,  // Autonomous autorotation
         AUTO_RTL =     27,  // Auto RTL, this is not a true mode, AUTO will report as this mode if entered to perform a DO_LAND_START Landing sequence
         TURTLE =       28,  // Flip over after crash
+        DRONE_SHOW =   127, // Pre-programmed drone light show
     };
 
     // constructor
@@ -1029,6 +1030,12 @@ private:
 
     // guided mode is paused or not
     bool _paused;
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // Allows the drone show mode to access our internals for reporting purposes
+    friend class ModeDroneShow;
+#endif
+
 };
 
 
@@ -1137,6 +1144,11 @@ private:
 #if PRECISION_LANDING == ENABLED
     bool _precision_loiter_enabled;
     bool _precision_loiter_active; // true if user has switched on prec loiter
+#endif
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // Allows the drone show mode to access our internals for reporting purposes
+    friend class ModeDroneShow;
 #endif
 
 };
@@ -1332,6 +1344,11 @@ private:
         // First pair of bits are still available, pilot yaw was mapped to bit 2 for symmetry with auto
         IgnorePilotYaw    = (1U << 2),
     };
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // Allows the drone show mode to access our internals for reporting purposes
+    friend class ModeDroneShow;
+#endif
 
 };
 
@@ -1841,4 +1858,8 @@ private:
     void warning_message(uint8_t message_n);    //Handles output messages to the terminal
 
 };
+#endif
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+ # include "mode_drone_show.h"
 #endif

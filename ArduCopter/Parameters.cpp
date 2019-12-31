@@ -259,7 +259,7 @@ const AP_Param::Info Copter::var_info[] = {
     // @Param: FLTMODE1
     // @DisplayName: Flight Mode 1
     // @Description: Flight mode when pwm of Flightmode channel(FLTMODE_CH) is <= 1230
-    // @Values: 0:Stabilize,1:Acro,2:AltHold,3:Auto,4:Guided,5:Loiter,6:RTL,7:Circle,9:Land,11:Drift,13:Sport,14:Flip,15:AutoTune,16:PosHold,17:Brake,18:Throw,19:Avoid_ADSB,20:Guided_NoGPS,21:Smart_RTL,22:FlowHold,23:Follow,24:ZigZag,25:SystemID,26:Heli_Autorotate,27:Auto RTL
+    // @Values: 0:Stabilize,1:Acro,2:AltHold,3:Auto,4:Guided,5:Loiter,6:RTL,7:Circle,9:Land,11:Drift,13:Sport,14:Flip,15:AutoTune,16:PosHold,17:Brake,18:Throw,19:Avoid_ADSB,20:Guided_NoGPS,21:Smart_RTL,22:FlowHold,23:Follow,24:ZigZag,25:SystemID,26:Heli_Autorotate,27:Auto RTL,128:DroneShow
     // @User: Standard
     GSCALAR(flight_mode1, "FLTMODE1",               (uint8_t)FLIGHT_MODE_1),
 
@@ -742,6 +742,12 @@ const AP_Param::Info Copter::var_info[] = {
     GOBJECT(osd, "OSD", AP_OSD),
 #endif
 
+    // @Group: CM_
+    // @Path: collmot_flockctrl.cpp
+#if COLLMOT_EXTENSIONS_ENABLED == ENABLED
+    GOBJECT(collmot, "CM_", CollMotFlockCtrl),
+#endif
+
     // @Group:
     // @Path: Parameters.cpp
     GOBJECT(g2, "",  ParametersG2),
@@ -1111,6 +1117,18 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("SURFTRAK_MODE", 51, ParametersG2, surftrak_mode, (uint8_t)Copter::SurfaceTracking::Surface::GROUND),
 
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // @Group: SHOW_
+    // @Path: ../libraries/AC_DroneShowManager/AC_DroneShowManager.cpp
+    //
+    // This is group 62; it is intentional as we don't want to assign ourselves
+    // a new group ID when new groups are added by the ArduCopter developers.
+    // Group 63 is used as a sentinel element in AP_Param.cpp so that won't
+    // work. Don't try it; the value of the variable at index 3 in this group
+    // will be lost every time the drone is rebooted.
+    AP_SUBGROUPINFO(drone_show_manager, "SHOW_", 62, ParametersG2, AC_DroneShowManager),
+#endif
+
     AP_GROUPEND
 };
 
@@ -1154,6 +1172,10 @@ ParametersG2::ParametersG2(void)
 #endif
 #if MODE_ZIGZAG_ENABLED == ENABLED
     ,mode_zigzag_ptr(&copter.mode_zigzag)
+#endif
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    ,mode_drone_show_ptr(&copter.mode_drone_show)
+    ,drone_show_manager()
 #endif
 {
     AP_Param::setup_object_defaults(this, var_info);

@@ -287,6 +287,9 @@ void NavEKF3_core::calcGpsGoodForFlight(void)
 
     // both GPS speed accuracy and EKF innovations must pass
     gpsAccuracyGood = gpsSpdAccPass && ekfInnovationsPass;
+
+    // also update whether the GPS fix is good enough for altitude
+    gpsAccuracyGoodForAltitude = gpsAccuracyGood && AP::gps().status() >= AP_GPS::GPS_OK_FIX_3D_RTK_FLOAT;
 }
 
 // Detect if we are in flight or on ground

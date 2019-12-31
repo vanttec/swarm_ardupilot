@@ -1281,6 +1281,18 @@ void AP_GPS::inject_data(const uint8_t *data, uint16_t len)
     } else {
         inject_data(_inject_to, data, len);
     }
+
+    // Log that we have injected some data to the GPS. We do this only for
+    // RTCM3 packets, which we can identify from the preamble.
+    if (len > 5 && data[0] == 0xD3) {
+        AP_Logger *logger = AP_Logger::get_singleton();
+        uint16_t type = (data[3] << 4) | (data[4] >> 4);
+
+        /* 12 bits from byte 3 encode the message type */
+        if (logger) {
+            logger->Write_GPSRTKPacket(type, len);
+        }
+    }
 }
 
 void AP_GPS::inject_data(uint8_t instance, const uint8_t *data, uint16_t len)
@@ -1459,9 +1471,11 @@ void AP_GPS::handle_gps_rtcm_fragment(uint8_t flags, const uint8_t *data, uint8_
     const uint8_t sequence = (flags >> 3U) & 0x1F;
 
     // see if this fragment is consistent with existing fragments
-    if (rtcm_buffer->fragments_received &&
-        (rtcm_buffer->sequence != sequence ||
-         (rtcm_buffer->fragments_received & (1U<<fragment)))) {
+    // The original ArduPilot code discards the entire re-assembly buffer if
+    // it receives the same fragment twice. This can cause problems if multiple
+    // channels (e.g., wifi and radio) are used for redundancy, hence we turn
+    // off this check.
+    if (rtcm_buffer->fragments_received && rtcm_buffer->sequence != sequence) {
         // we have one or more partial fragments already received
         // which conflict with the new fragment, discard previous fragments
         rtcm_buffer->fragment_count = 0;

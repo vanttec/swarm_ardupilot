@@ -903,6 +903,7 @@ ap_message GCS_MAVLINK::mavlink_id_to_ap_message_id(const uint32_t mavlink_id) c
         { MAVLINK_MSG_ID_HIGH_LATENCY2,         MSG_HIGH_LATENCY2},
         { MAVLINK_MSG_ID_AIS_VESSEL,            MSG_AIS_VESSEL},
         { MAVLINK_MSG_ID_UAVIONIX_ADSB_OUT_STATUS, MSG_UAVIONIX_ADSB_OUT_STATUS},
+        { MAVLINK_MSG_ID_DATA16,                MSG_DRONE_SHOW_STATUS},
             };
 
     for (uint8_t i=0; i<ARRAY_SIZE(map); i++) {
@@ -1141,6 +1142,10 @@ void GCS_MAVLINK::update_send()
 #if HAL_MAVLINK_INTERVALS_FROM_FILES_ENABLED
         initialise_message_intervals_from_config_files();
 #endif
+
+        // allow further customization of message intervals in derived classes
+        initialise_custom_message_intervals();
+
         deferred_messages_initialised = true;
     }
 

@@ -152,6 +152,7 @@ class Board:
             '-Wno-redundant-decls',
             '-Wno-unknown-pragmas',
             '-Wno-trigraphs',
+            '-Wno-unknown-warning-option',
             '-Werror=shadow',
             '-Werror=return-type',
             '-Werror=unused-result',
@@ -252,6 +253,7 @@ class Board:
             '-Wno-redundant-decls',
             '-Wno-unknown-pragmas',
             '-Wno-expansion-to-defined',
+            '-Wno-unknown-warning-option',
             '-Werror=cast-align',
             '-Werror=attributes',
             '-Werror=format-security',
@@ -626,6 +628,11 @@ class sitl(Board):
             if not cfg.check_SFML_Audio(env):
                 cfg.fatal("Failed to find SFML Audio libraries")
             env.CXXFLAGS += ['-DWITH_SITL_TONEALARM']
+
+        if cfg.options.sitl_use_sanitizers:
+            env.CFLAGS += ['-fsanitize=address,undefined']
+            env.CXXFLAGS += ['-fsanitize=address,undefined']
+            env.LDFLAGS += ['-fsanitize=address,undefined']
 
         if cfg.env.DEST_OS == 'cygwin':
             env.LIB += [

@@ -63,11 +63,25 @@ void Copter::failsafe_radio_on_event()
         desired_action = FailsafeAction::NONE;
 
     } else if ((flightmode->in_guided_mode()) &&
-      (failsafe_option(FailsafeOption::RC_CONTINUE_IF_GUIDED)) && (g.failsafe_gcs != FS_GCS_DISABLED)) {
+      (failsafe_option(FailsafeOption::RC_CONTINUE_IF_GUIDED)) && (g.failsafe_gcs != FS_GCS_DISABLED ||
+#if COLLMOT_EXTENSIONS_ENABLED == ENABLED
+collmot.allowContinueInGuidedModeWithoutGCSAndRC()
+#else
+false
+#endif
+    )) {
         // Allow guided mode to continue when FS_OPTIONS is set to continue in guided mode.  Only if the GCS failsafe is enabled.
+        // or if the CollMot-specific "allow continuing in guided mode even without GCS and RC" flag is set
         gcs().send_text(MAV_SEVERITY_WARNING, "Radio Failsafe - Continuing Guided Mode");
         desired_action = FailsafeAction::NONE;
 
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    } else if (flightmode->mode_number() == Mode::Number::DRONE_SHOW && failsafe_option(FailsafeOption::RC_CONTINUE_IF_GUIDED)) {
+        // Allow drone show mode to continue when FS_OPTIONS is set to continue in guided mode
+        gcs().send_text(MAV_SEVERITY_WARNING, "Radio Failsafe - Continuing Show");
+        desired_action = FailsafeAction::NONE;
+
+#endif
     } else {
         gcs().send_text(MAV_SEVERITY_WARNING, "Radio Failsafe");
     }
@@ -370,6 +384,9 @@ bool Copter::should_disarm_on_failsafe() {
         case Mode::Number::AUTO:
         case Mode::Number::AUTO_RTL:
             // if mission has not started AND vehicle is landed, disarm motors
+            return !ap.auto_armed && ap.land_complete;
+        case Mode::Number::DRONE_SHOW:
+            // if show has not started AND vehicle is landed, disarm motors
             return !ap.auto_armed && ap.land_complete;
         default:
             // used for AltHold, Guided, Loiter, RTL, Circle, Drift, Sport, Flip, Autotune, PosHold
