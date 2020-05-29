@@ -1795,7 +1795,9 @@ void GCS::send_statustext(MAV_SEVERITY severity, uint8_t dest_bitmask, const cha
     _statustext_queue.push_force(statustext);
 
     // try and send immediately if possible
-    service_statustext();
+    if (hal.scheduler->in_main_thread()) {
+        service_statustext();
+    }
 }
 
 /*
@@ -2055,12 +2057,9 @@ void GCS_MAVLINK::send_opticalflow()
     const Vector2f &flowRate = optflow->flowRate();
     const Vector2f &bodyRate = optflow->bodyRate();
 
-    const AP_AHRS &ahrs = AP::ahrs();
-    float hagl = 0;
-    if (ahrs.have_inertial_nav()) {
-        if (!ahrs.get_hagl(hagl)) {
-            return;
-        }
+    float hagl;
+    if (!AP::ahrs().get_hagl(hagl)) {
+        hagl = 0;
     }
 
     // populate and send message
@@ -3015,6 +3014,19 @@ void GCS_MAVLINK::handle_optical_flow(const mavlink_message_t &msg)
     optflow->handle_msg(msg);
 }
 
+
+/*
+  handle MAV_CMD_FIXED_MAG_CAL_YAW
+ */
+MAV_RESULT GCS_MAVLINK::handle_fixed_mag_cal_yaw(const mavlink_command_long_t &packet)
+{
+    Compass &compass = AP::compass();
+    return compass.mag_cal_fixed_yaw(packet.param1,
+                                     uint8_t(packet.param2),
+                                     packet.param3,
+                                     packet.param4);
+}
+
 /*
   handle messages which don't require vehicle specific data
  */
@@ -3277,6 +3289,12 @@ void GCS_MAVLINK::send_banner()
     char sysid[40];
     if (hal.util->get_system_id(sysid)) {
         send_text(MAV_SEVERITY_INFO, "%s", sysid);
+    }
+
+    // send RC output mode info if available
+    char banner_msg[50];
+    if (hal.rcout->get_output_mode_banner(banner_msg, sizeof(banner_msg))) {
+        send_text(MAV_SEVERITY_INFO, "%s", banner_msg);
     }
 }
 
@@ -3734,6 +3752,10 @@ MAV_RESULT GCS_MAVLINK::handle_command_long_packet(const mavlink_command_long_t 
 
         return MAV_RESULT_UNSUPPORTED;
 
+    case MAV_CMD_FIXED_MAG_CAL_YAW:
+        result = handle_fixed_mag_cal_yaw(packet);
+        break;
+        
     default:
         result = MAV_RESULT_UNSUPPORTED;
         break;
