@@ -263,6 +263,12 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
+// Drone show - perform a timed waypoint flight with LED lights
+#ifndef MODE_DRONE_SHOW_ENABLED
+# define MODE_DRONE_SHOW_ENABLED ENABLED
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
 // flip - fly vehicle in flip in pitch and roll direction mode
 #ifndef MODE_FLIP_ENABLED
 # define MODE_FLIP_ENABLED ENABLED

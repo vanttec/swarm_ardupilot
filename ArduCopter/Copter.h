@@ -204,6 +204,7 @@ public:
     friend class ModeBrake;
     friend class ModeCircle;
     friend class ModeDrift;
+    friend class ModeDroneShow;
     friend class ModeFlip;
     friend class ModeFlowHold;
     friend class ModeFollow;
@@ -984,6 +985,9 @@ private:
 #endif
 #if MODE_AUTOROTATE_ENABLED == ENABLED
     ModeAutorotate mode_autorotate;
+#endif
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    ModeDroneShow mode_drone_show;
 #endif
 
     // mode.cpp

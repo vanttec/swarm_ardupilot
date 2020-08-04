@@ -648,6 +648,11 @@ public:
 #if MODE_GUIDED_ENABLED == ENABLED
     AP_Float guided_timeout;
 #endif
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // we need a pointer to the mode for the G2 table
+    void *mode_drone_show_ptr;
+#endif
 };
 
 extern const AP_Param::Info        var_info[];
