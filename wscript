@@ -233,6 +233,10 @@ configuration in order to save typing.
                  default=False,
                  help="Enable SITL RGBLed")
 
+    g.add_option('--sitl-use-sanitizers', action='store_true',
+                 default=False,
+                 help="Enable SITL sanitizers")
+
     g.add_option('--build-dates', action='store_true',
                  default=False,
                  help="Include build date in binaries.  Appears in AUTOPILOT_VERSION.os_sw_version")
@@ -301,7 +305,7 @@ def configure(cfg):
             if b.upper() == cfg.options.board.upper():
                 cfg.options.board = b
                 break
-        
+
     cfg.env.BOARD = cfg.options.board
     cfg.env.DEBUG = cfg.options.debug
     cfg.env.COVERAGE = cfg.options.coverage
@@ -400,6 +404,11 @@ def configure(cfg):
 
     cfg.env.prepend_value('INCLUDES', [
         cfg.srcnode.abspath() + '/libraries/',
+    ])
+
+    cfg.env.append_value('GIT_SUBMODULES', 'libskybrush')
+    cfg.env.append_value('INCLUDES', [
+        cfg.srcnode.abspath() + '/modules/libskybrush/include/',
     ])
 
     cfg.find_program('rsync', mandatory=False)
@@ -628,7 +637,7 @@ def _load_pre_build(bld):
     '''allow for a pre_build() function in build modules'''
     brd = bld.get_board()
     if getattr(brd, 'pre_build', None):
-        brd.pre_build(bld)    
+        brd.pre_build(bld)
 
 def build(bld):
     config_hash = Utils.h_file(bld.bldnode.make_node('ap_config.h').abspath())

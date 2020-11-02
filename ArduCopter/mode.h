@@ -36,7 +36,7 @@ public:
         ZIGZAG    =    24,  // ZIGZAG mode is able to fly in a zigzag manner with predefined point A and point B
         SYSTEMID  =    25,  // System ID mode produces automated system identification signals in the controllers
         AUTOROTATE =   26,  // Autonomous autorotation
-        DRONE_SHOW =   128, // Pre-programmed drone light show
+        DRONE_SHOW =   127, // Pre-programmed drone light show
     };
 
     // constructor
@@ -939,6 +939,10 @@ private:
     SubMode guided_mode = SubMode::TakeOff;
     bool send_notification;     // used to send one time notification to ground station
 
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // Allows the drone show mode to access our internals for reporting purposes
+    friend class ModeDroneShow;
+#endif
 };
 
 
@@ -1046,6 +1050,11 @@ private:
 
 #if PRECISION_LANDING == ENABLED
     bool _precision_loiter_enabled;
+#endif
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // Allows the drone show mode to access our internals for reporting purposes
+    friend class ModeDroneShow;
 #endif
 
 };
@@ -1241,6 +1250,11 @@ private:
     };
 
     bool use_pilot_yaw(void) const;
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // Allows the drone show mode to access our internals for reporting purposes
+    friend class ModeDroneShow;
+#endif
 
 };
 
@@ -1728,10 +1742,11 @@ public:
 
     virtual bool init(bool ignore_checks) override;
     virtual void run() override;
+    virtual void exit() override;
 
     bool requires_GPS() const override { return true; }
     bool has_manual_throttle() const override { return false; }
-    bool allows_arming(AP_Arming::Method method) const override { return false; };
+    bool allows_arming(AP_Arming::Method method) const override;
     bool is_autopilot() const override { return true; }
 
     bool is_landing() const override;
@@ -1747,43 +1762,24 @@ protected:
 
     // for reporting to GCS
     bool get_wp(Location &loc) override;
-    // TODO(ntamas): implement these!
-    // uint32_t wp_distance() const override;
-    // int32_t wp_bearing() const override;
-    // float crosstrack_error() const override { return wp_nav->crosstrack_error();}
+    uint32_t wp_distance() const override;
+    int32_t wp_bearing() const override;
+    float crosstrack_error() const override;
 
 private:
-
-    // Drone show mode stages
-    enum DroneShowModeStage {
-        DroneShow_Init,
-        DroneShow_WaitForStartTime,
-        DroneShow_Takeoff,
-        DroneShow_Performing,
-        DroneShow_RTL,
-        DroneShow_Landing,
-        DroneShow_Landed,
-        DroneShow_Error
-    };
 
     // --- Internal variables ---
 
     // Execution stage of the show
     DroneShowModeStage _stage;
 
-    // Start time in GPS time of week (seconds), as set by the user
-    AP_Int32 _start_time_gps_sec;
-
-    // Copy of _start_time_sec; used to detect when the start time was
-    // changed by the user
-    AP_Int32 _last_seen_start_time_gps_sec;
-
     // Stores whether we have attempted to start the motors, due 10 seconds
     // before takeoff.
     bool _motors_started;
 
-    // _start_time_gps_sec converted to a UNIX timestamp
-    uint64_t _start_time_usec;
+    // Stores when we are supposed to print the next status report as a STATUSTEXT
+    // message
+    uint64_t _next_status_report_due_at;
 
     // Stores whether we have performed the preflight calibration due 15
     // seconds before takeoff.
@@ -1793,23 +1789,40 @@ private:
     // have attempted to arm the drone recently
     uint32_t _prevent_arming_until_msec;
 
-    int64_t get_elapsed_time_since_start_usec() const;
-    float get_elapsed_time_since_start_sec() const;
-    int64_t get_time_until_start_usec() const;
-    float get_time_until_start_sec() const;
+    // Sets the stage of the execution to the given value
+    void _set_stage(DroneShowModeStage value);
+
+    bool cancel_requested() const;
 
     void check_changes_in_parameters();
     void notify_start_time_changed();
+    bool send_guided_mode_command_during_performance();
     bool start_motors_if_needed();
 
+    void initialization_start();
     void initialization_run();
 
     void wait_for_start_time_start();
     void wait_for_start_time_run();
 
+    void takeoff_start();
+    void takeoff_run();
+    bool takeoff_completed() const;
+
+    void performing_start();
+    void performing_run();
+    bool performing_completed() const;
+
+    void landing_start();
+    void landing_run();
+    bool landing_completed() const;
+
     void rtl_start();
     void rtl_run();
-    bool rtl_completed();
+    bool rtl_completed() const;
+
+    void loiter_start();
+    void loiter_run();
 
     void landed_start();
     void landed_run();

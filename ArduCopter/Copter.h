@@ -68,6 +68,7 @@
 #include <AC_Sprayer/AC_Sprayer.h>          // Crop sprayer library
 #include <AP_ADSB/AP_ADSB.h>                // ADS-B RF based collision avoidance module library
 #include <AP_Proximity/AP_Proximity.h>      // ArduPilot proximity sensor library
+#include <AC_DroneShowManager/AC_DroneShowManager.h>  // Drone show library
 
 // Configuration
 #include "defines.h"

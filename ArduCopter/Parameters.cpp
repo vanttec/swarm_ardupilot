@@ -1071,11 +1071,14 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
 
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
     // @Group: SHOW_
-    // @Path: ../libraries/AC_DroneShow/AC_DroneShow.cpp
+    // @Path: ../libraries/AC_DroneShowManager/AC_DroneShowManager.cpp
     //
-    // This is group 63; it is intentional as we don't want to assign ourselves
-    // a new group ID when new groups are added by the ArduCopter developers
-    AP_SUBGROUPPTR(mode_drone_show_ptr, "SHOW_", 63, ParametersG2, ModeDroneShow),
+    // This is group 62; it is intentional as we don't want to assign ourselves
+    // a new group ID when new groups are added by the ArduCopter developers.
+    // Group 63 is used as a sentinel element in AP_Param.cpp so that won't
+    // work. Don't try it; the value of the variable at index 3 in this group
+    // will be lost every time the drone is rebooted.
+    AP_SUBGROUPINFO(drone_show_manager, "SHOW_", 62, ParametersG2, AC_DroneShowManager),
 #endif
 
     AP_GROUPEND
@@ -1122,6 +1125,7 @@ ParametersG2::ParametersG2(void)
 #endif
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
     ,mode_drone_show_ptr(&copter.mode_drone_show)
+    ,drone_show_manager()
 #endif
 {
     AP_Param::setup_object_defaults(this, var_info);

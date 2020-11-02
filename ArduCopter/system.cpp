@@ -173,6 +173,11 @@ void Copter::init_ardupilot()
     g2.smart_rtl.init();
 #endif
 
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // initialise drone show subsystem
+    g2.drone_show_manager.init();
+#endif
+
     // initialise AP_Logger library
     logger.setVehicle_Startup_Writer(FUNCTOR_BIND(&copter, &Copter::Log_Write_Vehicle_Startup_Messages, void));
 

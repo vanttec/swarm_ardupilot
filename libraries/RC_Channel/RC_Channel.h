@@ -220,6 +220,9 @@ public:
         AIRBRAKE =           210, // manual airbrake control
         WALKING_HEIGHT =     211, // walking robot height input
 
+        // inputs added for the drone show extension
+        DRONE_SHOW_START =   248, // drone show control
+
         // inputs for the use of onboard lua scripting
         SCRIPTING_1 =        300,
         SCRIPTING_2 =        301,

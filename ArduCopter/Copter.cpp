@@ -205,6 +205,9 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
 #if STATS_ENABLED == ENABLED
     SCHED_TASK_CLASS(AP_Stats,             &copter.g2.stats,            update,           1, 100),
 #endif
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    SCHED_TASK_CLASS(AC_DroneShowManager,  &copter.g2.drone_show_manager, update, 25, 100),
+#endif
 };
 
 void Copter::get_scheduler_tasks(const AP_Scheduler::Task *&tasks,

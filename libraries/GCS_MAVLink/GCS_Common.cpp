@@ -852,6 +852,7 @@ ap_message GCS_MAVLINK::mavlink_id_to_ap_message_id(const uint32_t mavlink_id) c
         { MAVLINK_MSG_ID_GENERATOR_STATUS,      MSG_GENERATOR_STATUS},
         { MAVLINK_MSG_ID_WINCH_STATUS,          MSG_WINCH_STATUS},
         { MAVLINK_MSG_ID_WATER_DEPTH,           MSG_WATER_DEPTH},
+        { MAVLINK_MSG_ID_DATA16,                MSG_DRONE_SHOW_STATUS},
             };
 
     for (uint8_t i=0; i<ARRAY_SIZE(map); i++) {
@@ -5164,6 +5165,10 @@ void GCS_MAVLINK::initialise_message_intervals_from_streamrates()
         initialise_message_intervals_for_stream(all_stream_entries[i].stream_id);
     }
     set_mavlink_message_id_interval(MAVLINK_MSG_ID_HEARTBEAT, 1000);
+
+    // TODO(ntamas): this should be conditional on MODE_DRONE_SHOW_ENABLED == ENABLED
+    // but it is not available in this file
+    set_mavlink_message_id_interval(MAVLINK_MSG_ID_DATA16, 1000);
 }
 
 bool GCS_MAVLINK::get_default_interval_for_ap_message(const ap_message id, uint16_t &interval) const

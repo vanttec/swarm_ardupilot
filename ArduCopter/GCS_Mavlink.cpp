@@ -42,6 +42,7 @@ MAV_MODE GCS_MAVLINK_Copter::base_mode() const
     case Mode::Number::POSHOLD:
     case Mode::Number::BRAKE:
     case Mode::Number::SMART_RTL:
+    case Mode::Number::DRONE_SHOW:
         _base_mode |= MAV_MODE_FLAG_GUIDED_ENABLED;
         // note that MAV_MODE_FLAG_AUTO_ENABLED does not match what
         // APM does in any mode, as that is defined as "system finds its own goal
@@ -336,6 +337,14 @@ bool GCS_MAVLINK_Copter::try_send_message(enum ap_message id)
                 oadb->send_adsb_vehicle(chan, interval_ms);
             }
         }
+#endif
+        break;
+    }
+
+    case MSG_DRONE_SHOW_STATUS: {
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+        CHECK_PAYLOAD_SIZE(DATA16);
+        copter.g2.drone_show_manager.send_drone_show_status(chan);
 #endif
         break;
     }
@@ -970,6 +979,17 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
         return MAV_RESULT_ACCEPTED;
     }
 
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+        /* User requested to clear or reload the current show file */
+    case MAV_CMD_USER_1: {
+        if (copter.g2.drone_show_manager.reload_or_clear_show(/* do_clear = */ !is_zero(packet.param1))) {
+            return MAV_RESULT_ACCEPTED;
+        } else {
+            return MAV_RESULT_FAILED;
+        }
+    }
+#endif
+
     default:
         return GCS_MAVLINK::handle_command_long_packet(packet);
     }
@@ -1340,6 +1360,15 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
         break;
 #endif
         
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    case MAVLINK_MSG_ID_LED_CONTROL:
+        if (!copter.g2.drone_show_manager.handle_message(msg)) {
+            // also make sure to keep the original behaviour
+            handle_common_message(msg);
+        }
+        break;
+#endif
+
     default:
         handle_common_message(msg);
         break;
@@ -1382,6 +1411,9 @@ uint64_t GCS_MAVLINK_Copter::capabilities() const
             MAV_PROTOCOL_CAPABILITY_SET_ATTITUDE_TARGET |
 #if AP_TERRAIN_AVAILABLE && AC_TERRAIN
             (copter.terrain.enabled() ? MAV_PROTOCOL_CAPABILITY_TERRAIN : 0) |
+#endif
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+            0x4000000 | /* custom extension */
 #endif
             GCS_MAVLINK::capabilities());
 }

@@ -1,40 +1,36 @@
 #include "Copter.h"
 
+#include <skybrush/colors.h>
+
 /*
  * Implementation of drone show flight mode
  */
 
-const AP_Param::GroupInfo ModeDroneShow::var_info[] = {
-    // @Param: START_TIME
-    // @DisplayName: Start time
-    // @Description: Start time of drone show as a GPS time of week timestamp (sec), negative if unset
-    // @Range: -1 604799
-    // @Increment: 1
-    // @Units: sec
-    // @User: Standard
-    // 
-    // Note that we cannot use UNIX timestamps here because ArduPilot stores
-    // all parameters as floats, and floats can represent integers accurately
-    // only up to 2^23 - 1
-    AP_GROUPINFO("START_TIME", 1, ModeDroneShow, _start_time_gps_sec, -1),
-
-    AP_GROUPEND
-};
-
 // Constructor.
 ModeDroneShow::ModeDroneShow(void) : Mode(),
-    _stage(DroneShow_WaitForStartTime)
+    _stage(DroneShow_Off),
+    _next_status_report_due_at(0)
 {
-    // Ensures that the parameters always revert to the defaults when the
-    // UAV is rebooted.
-    AP_Param::setup_object_defaults(this, var_info);
 }
 
 bool ModeDroneShow::init(bool ignore_checks)
 {
-    // Clear the last seen start time so we show a message to acknowledge any
-    // new start time set by the user, even if it was set earlier
-    _last_seen_start_time_gps_sec = -1;
+    initialization_start();
+    return true;
+}
+
+void ModeDroneShow::exit()
+{
+    // If we haven't taken off yet, disarm the motors. Apparently
+    // copter.ap.land_complete is sometimes false when we are in the
+    // DroneShow_WaitForStartTime stage and we are in the time window where
+    // the motors were armed already but we haven't taken off yet, so we need
+    // to disarm if we are in the DroneShow_WaitForStartTime unconditionally
+    // (otherwise we would end up in poshold mode the next time we enter the
+    // drone show mode)
+    if ((copter.ap.land_complete || _stage == DroneShow_WaitForStartTime) && motors->armed()) {
+        AP::arming().disarm(AP_Arming::Method::SCRIPTING);
+    }
 
     // Clear the timestamp when we last attempted to arm the drone
     _prevent_arming_until_msec = 0;
@@ -42,7 +38,25 @@ bool ModeDroneShow::init(bool ignore_checks)
     // Clear all the status information that depends on the start time
     notify_start_time_changed();
 
-    return true;
+    // Set the stage to "off"
+    _set_stage(DroneShow_Off);
+
+    // Notify the drone show manager that the drone show mode exited
+    copter.g2.drone_show_manager.notify_drone_show_mode_exited();
+}
+
+bool ModeDroneShow::allows_arming(AP_Arming::Method method) const
+{
+    return (
+        method != AP_Arming::Method::MAVLINK &&
+        copter.g2.drone_show_manager.loaded_show_data_successfully() &&
+        copter.g2.drone_show_manager.has_valid_takeoff_time()
+    );
+}
+
+bool ModeDroneShow::cancel_requested() const
+{
+    return copter.g2.drone_show_manager.cancel_requested();
 }
 
 // ModeDroneShow::run - runs the main drone show controller
@@ -64,9 +78,29 @@ void ModeDroneShow::run()
         wait_for_start_time_run();
         break;
 
+    case DroneShow_Takeoff:
+        // taking off
+        takeoff_run();
+        break;
+
+    case DroneShow_Performing:
+        // performing show
+        performing_run();
+        break;
+
+    case DroneShow_Landing:
+        // landing at the end of the show (normal termination)
+        landing_run();
+        break;
+
     case DroneShow_RTL:
-        // returning to landing position
+        // returning to home position (abnormal termination)
         rtl_run();
+        break;
+
+    case DroneShow_Loiter:
+        // holding position (joined show while airborne)
+        loiter_run();
         break;
 
     case DroneShow_Landed:
@@ -87,28 +121,70 @@ void ModeDroneShow::run()
 // Checks changes in relevant parameter values and reports them to the console
 void ModeDroneShow::check_changes_in_parameters()
 {
-    if (_start_time_gps_sec != _last_seen_start_time_gps_sec) {
-        _last_seen_start_time_gps_sec = _start_time_gps_sec;
+    static uint64_t last_seen_start_time_usec;
+    uint64_t current_start_time_usec = copter.g2.drone_show_manager.get_start_time_usec();
 
+    if (current_start_time_usec != last_seen_start_time_usec) {
+        last_seen_start_time_usec = current_start_time_usec;
         notify_start_time_changed();
-
-        if (_start_time_gps_sec >= 0) {
-            gcs().send_text(
-                MAV_SEVERITY_INFO, "Start time set to %llu",
-                static_cast<unsigned long long int>(_start_time_usec)
-            );
-        } else {
-            gcs().send_text(MAV_SEVERITY_INFO, "Start time cleared");
-        }
     }
 }
 
 bool ModeDroneShow::get_wp(Location& destination)
 {
     switch (_stage) {
-    // TODO(ntamas): implement this for the other stages
+    case DroneShow_Performing:
+        return copter.mode_guided.get_wp(destination);
+    case DroneShow_Loiter:
+        return copter.mode_loiter.get_wp(destination);
+    case DroneShow_Landing:
+        return copter.mode_land.get_wp(destination);
     case DroneShow_RTL:
         return copter.mode_rtl.get_wp(destination);
+    default:
+        return false;
+    }
+}
+
+int32_t ModeDroneShow::wp_bearing() const
+{
+    switch (_stage) {
+    case DroneShow_Performing:
+        return copter.mode_guided.wp_bearing();
+    case DroneShow_Landing:
+        return copter.mode_land.wp_bearing();
+    case DroneShow_RTL:
+        return copter.mode_rtl.wp_bearing();
+    default:
+        return false;
+    }
+}
+
+uint32_t ModeDroneShow::wp_distance() const
+{
+    switch (_stage) {
+    case DroneShow_Performing:
+        return copter.mode_guided.wp_distance();
+    case DroneShow_Landing:
+        return copter.mode_land.wp_distance();
+    case DroneShow_RTL:
+        return copter.mode_rtl.wp_distance();
+    default:
+        return false;
+    }
+}
+
+float ModeDroneShow::crosstrack_error() const
+{
+    switch (_stage) {
+    case DroneShow_Performing:
+        return copter.mode_guided.crosstrack_error();
+    case DroneShow_Loiter:
+        return copter.mode_loiter.crosstrack_error();
+    case DroneShow_Landing:
+        return copter.mode_land.crosstrack_error();
+    case DroneShow_RTL:
+        return copter.mode_rtl.crosstrack_error();
     default:
         return false;
     }
@@ -132,6 +208,30 @@ bool ModeDroneShow::is_taking_off() const
     return ((_stage == DroneShow_Takeoff) && !wp_nav->reached_wp_destination());
 }
 
+// starts the initialization phase of the drone
+void ModeDroneShow::initialization_start()
+{
+    // Set the appropriate stage
+    _set_stage(DroneShow_Init);
+
+    // Clear the timestamp when we last attempted to arm the drone
+    // TODO(ntamas): prevent arming from the current timestamp until the next
+    // five seconds _after_ the drone is armed to prevent injury when someone
+    // presses the safety button of the drone while a close start time is
+    // already set
+    _prevent_arming_until_msec = 0;
+
+    // Clear the limits of the guided mode; we will use guided mode internally
+    // to control the show
+    copter.mode_guided.limit_clear();
+
+    // Clear all the status information that depends on the start time
+    notify_start_time_changed();
+
+    // Notify the drone show manager that the drone show mode was initialized
+    copter.g2.drone_show_manager.notify_drone_show_mode_initialized();
+}
+
 // initializes the drone show mode after it has been activated the first time
 void ModeDroneShow::initialization_run()
 {
@@ -140,73 +240,320 @@ void ModeDroneShow::initialization_run()
         // Great, let's move to the state where we wait for the start time
         wait_for_start_time_start();
     } else {
-        // We are already in the air
-        // TODO(ntamas): this is not handled yet; we should attempt to resume
-        // the show if possible
-        rtl_start();
+        // We are already in the air. We enter position hold mode as we don't
+        // know where the show clock is
+        loiter_start();
     }
 }
 
 // starts the phase where we are waiting for the start time of the show
 void ModeDroneShow::wait_for_start_time_start()
 {
-    _stage = DroneShow_WaitForStartTime;
-
+    _set_stage(DroneShow_WaitForStartTime);
     gcs().send_text(MAV_SEVERITY_INFO, "Waiting for start time of show");
 }
 
 // waits for the start time of the show
 void ModeDroneShow::wait_for_start_time_run()
 {
-    uint64_t now = AP_HAL::micros64();
-    float time_until_start_sec = get_time_until_start_sec();
-    static uint64_t last;
+    float time_until_takeoff_sec = copter.g2.drone_show_manager.get_time_until_takeoff_sec();
+    float time_since_takeoff_sec = -time_until_takeoff_sec;
+    const float latest_takeoff_attempt_after_scheduled_takeoff_time_in_seconds = 5.0f;
 
-    if (now - last >= 1000000) {
-        float elapsed = get_elapsed_time_since_start_sec();
-        if (elapsed >= 0) {
-            gcs().send_text(
-                MAV_SEVERITY_INFO, "Time since show start: %.2fs", elapsed
-            );
-        } else {
-            gcs().send_text(
-                MAV_SEVERITY_INFO, "Time until show start: %.2fs", -elapsed
-            );
+    // TODO(ntamas): what if cancel_requested() is true in AC_DroneShowManager?
+    /*
+    uint64_t now = AP_HAL::micros64();
+
+    if (now >= _next_status_report_due_at)
+    {
+        float elapsed = copter.g2.drone_show_manager.get_elapsed_time_since_start_sec();
+
+        if (isfinite(elapsed)) {
+            if (elapsed >= 0) {
+                gcs().send_text(
+                    MAV_SEVERITY_INFO, "Time since show start: %.2fs", elapsed
+                );
+            } else if (elapsed > -86400) {
+                gcs().send_text(
+                    MAV_SEVERITY_INFO, "Time until show start: %.2fs", -elapsed
+                );
+            }
         }
 
-        last = now;
+        if (time_until_takeoff_sec > 15)
+        {
+            _next_status_report_due_at = now + 5000000;
+        }
+        else
+        {
+            _next_status_report_due_at = now + 1000000;
+        }
     }
+    */
 
-    if (time_until_start_sec <= 15 && !_preflight_calibration_done) {
-        // This is copied from GCS_MAVLINK::_handle_command_preflight_calibration_baro()
-        gcs().send_text(MAV_SEVERITY_INFO, "Updating barometer calibration");
-        AP::baro().update_calibration();
-        gcs().send_text(MAV_SEVERITY_INFO, "Barometer calibration complete");
-
-        // TODO(ntamas): also perform gyro calibration?
-
-        _preflight_calibration_done = true;
-    }
-
-    if (time_until_start_sec <= 10 && !_motors_started) {
-        // We attempt to start the motors 10 seconds before the show, and we
-        // keep on doing so until 5 seconds into the show, after which we give up
-        if (time_until_start_sec >= -5) {
-            start_motors_if_needed();
+    if (time_since_takeoff_sec > latest_takeoff_attempt_after_scheduled_takeoff_time_in_seconds + 1) {
+        // We are late to the party, just move to the landed or poshold state.
+        // The +1 second is needed to ensure that we show a "giving up"
+        // failure message below
+        if (is_disarmed_or_landed()) {
+            landed_start();
         } else {
-            error_start();
+            // In theory, this branch should not happen because we don't move to
+            // the "wait for start time" phase if we are flying
+            loiter_start();
+        }
+    } else {
+        if (time_until_takeoff_sec <= 10 && !_preflight_calibration_done) {
+            // We calibrate the barometer 10 seconds before our takeoff time.
+            // This will reset the internal AGL measurement to zero.
+            //
+            // Preflight calibration does not hurt anyone so we don't need the
+            // takeoff authorization for this
+
+            // This is copied from GCS_MAVLINK::_handle_command_preflight_calibration_baro()
+            gcs().send_text(MAV_SEVERITY_INFO, "Updating barometer calibration");
+            AP::baro().update_calibration();
+            gcs().send_text(MAV_SEVERITY_INFO, "Barometer calibration complete");
+
+            _preflight_calibration_done = true;
+        }
+
+        // For the remaining parts, we need takeoff authorization
+        if (copter.g2.drone_show_manager.has_authorization_to_start()) {
+            if (time_until_takeoff_sec <= 5 && !_motors_started) {
+                // We attempt to start the motors 5 seconds before our takeoff time,
+                // and we keep on doing so until 5 seconds after the takeoff time, when
+                // we give up
+                if (time_since_takeoff_sec < latest_takeoff_attempt_after_scheduled_takeoff_time_in_seconds) {
+                    if (start_motors_if_needed()) {
+                        // Great, motors started
+                        _motors_started = true;
+                    }
+                } else {
+                    // Do not change or remove this message; it is used in test cases
+                    gcs().send_text(MAV_SEVERITY_CRITICAL, "Failed to start, giving up");
+                    error_start();
+                }
+            }
+
+            if (time_until_takeoff_sec <= 0 && _motors_started) {
+                // Time to take off!
+                takeoff_start();
+            }
+        } else {
+            // No authorization; stop the motors if we have started them
+            if (_motors_started) {
+                if (AP::arming().is_armed()) {
+                    AP::arming().disarm(AP_Arming::Method::SCRIPTING);
+                }
+
+                _motors_started = false;
+            }
         }
     }
 }
 
-// starts the phase where we are returning to our landing position
+// starts the phase where we are taking off at the start of the show
+void ModeDroneShow::takeoff_start()
+{
+    Location current_location;
+
+    _set_stage(DroneShow_Takeoff);
+
+    // the body of this function is mostly copied from ModeGuided::do_user_takeoff_start()
+
+    // notify the drone show manager that we are about to take off. The drone
+    // show manager _may_ use our current position and heading as show origin
+    // if no explicit show origin was set
+    copter.ahrs.get_position(current_location);
+    copter.g2.drone_show_manager.notify_takeoff(current_location, copter.ahrs.get_yaw());
+
+    // set the current waypoint destination above the current position
+    Location target_loc = copter.current_loc;
+    target_loc.set_alt_cm(
+        AC_DroneShowManager::TAKEOFF_ALTITUDE_METERS * 100.0f,
+        Location::AltFrame::ABOVE_HOME
+    );
+
+    // gcs().send_text(MAV_SEVERITY_INFO, "Takeoff target set to %ld %ld %ld", (long int)target_loc.lat, (long int)target_loc.lng, (long int)target_loc.alt);
+
+    if (!wp_nav->set_wp_destination_loc(target_loc)) {
+        AP::logger().Write_Error(LogErrorSubsystem::NAVIGATION, LogErrorCode::FAILED_TO_SET_DESTINATION);
+        error_start();
+        return;
+    }
+
+    if (wp_nav->reached_wp_destination()) {
+        gcs().send_text(MAV_SEVERITY_WARNING, "Takeoff target already reached");
+    }
+
+    // initialise yaw
+    auto_yaw.set_mode(AUTO_YAW_HOLD);
+
+    // clear I term when we're taking off
+    set_throttle_takeoff();
+
+    // get initial alt for WP_NAVALT_MIN
+    auto_takeoff_set_start_alt();
+
+    // pretend that we were armed by the user by raising the throttle; the auto
+    // takeoff routine won't work without this.
+    copter.set_auto_armed(true);
+
+    gcs().send_text(MAV_SEVERITY_INFO, "Taking off");
+}
+
+// performs the takeoff stage
+void ModeDroneShow::takeoff_run()
+{
+    auto_takeoff_run();
+
+    if (cancel_requested()) {
+        // if a cancellation was requested, land immediately
+        landing_start();
+    } else if (!motors->armed()) {
+        // if the motors are not armed any more, something is wrong so move to the
+        // error stage. This typically happens if we crash during a show.
+        error_start();
+    } else if (takeoff_completed()) {
+        // if the takeoff has finished, move to the "show" stage
+        performing_start();
+    }
+}
+
+// returns whether the RTL operation has finished successfully. Must be called
+// from the RTL stage only.
+bool ModeDroneShow::takeoff_completed() const
+{
+    if (_stage == DroneShow_Takeoff) {
+        return wp_nav->reached_wp_destination();
+    } else if (_stage >= DroneShow_Performing && _stage <= DroneShow_Landed) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+// starts the phase where we are actually performing the show
+void ModeDroneShow::performing_start()
+{
+    _set_stage(DroneShow_Performing);
+
+    // call regular guided flight mode initialisation
+    copter.mode_guided.init(true);
+
+    // initialise guided start time and position as reference for limit checking
+    copter.mode_guided.limit_init_time_and_pos();
+
+    gcs().send_text(MAV_SEVERITY_INFO, "Starting show");
+}
+
+// performs the takeoff stage
+void ModeDroneShow::performing_run()
+{
+    static uint32_t last_guided_command = 0;
+    bool exited_mode = 0;
+    uint32_t now = AP_HAL::millis();
+
+    if (now - last_guided_command >= 250) {
+        if (!send_guided_mode_command_during_performance()) {
+            // Failed to send guided mode command; try to switch to position
+            // hold instead. This should not happen anyway.
+            loiter_start();
+            exited_mode = 1;
+        }
+        last_guided_command = now;
+    }
+
+    // call regular guided flight mode run function
+    if (!exited_mode) {
+        copter.mode_guided.run();
+    }
+
+    if (cancel_requested()) {
+        // if a cancellation was requested, return to home and then land
+        rtl_start();
+    } else if (!motors->armed()) {
+        // if the motors are not armed any more, something is wrong so move to the
+        // error stage. This typically happens if we crash during a show.
+        error_start();
+    } else if (performing_completed()) {
+        // if we have finished the show, land
+        landing_start();
+    }
+}
+
+bool ModeDroneShow::performing_completed() const
+{
+    // TODO(ntamas): what if we are late and we are not at the designated landing
+    // position yet?
+    return copter.g2.drone_show_manager.get_time_until_landing_sec() <= 0;
+}
+
+// starts the phase where we are landing at the place where we are, used at
+// the end of a show
+void ModeDroneShow::landing_start()
+{
+    _set_stage(DroneShow_Landing);
+
+    gcs().send_text(MAV_SEVERITY_INFO, "Landing");
+
+    // TODO(ntamas): set stopping point of loiter nav properly so we land as
+    // close to our destination as possible
+
+    // call regular land flight mode initialisation and ask it to ignore checks
+    copter.mode_land.init(/* ignore_checks = */ true);
+}
+
+// performs the landing stage
+void ModeDroneShow::landing_run()
+{
+    /*
+    uint64_t now = AP_HAL::micros64();
+    static uint64_t last = 0;
+
+    if (now - last >= 1000000) {
+        gcs().send_text(
+            MAV_SEVERITY_INFO, "Land complete: %s, spool state: %d",
+            copter.ap.land_complete ? "yes" : "no",
+            static_cast<int>(motors->get_spool_state())
+        );
+        last = now;
+    }
+    */
+
+    // call regular land flight mode run function
+    copter.mode_land.run();
+
+    // if we have finished landing, move to the "landed" state
+    if (landing_completed()) {
+        landed_start();
+    }
+}
+
+// returns whether the landing operation has finished successfully. Must be called
+// from the landing stage only.
+bool ModeDroneShow::landing_completed() const
+{
+    if (_stage == DroneShow_Landing) {
+        return (
+            copter.ap.land_complete &&
+            motors->get_spool_state() == AP_Motors::SpoolState::GROUND_IDLE
+        );
+    } else {
+        return false;
+    }
+}
+
+// starts the phase where we are returning to our home position, used during
+// aborted shows
 void ModeDroneShow::rtl_start()
 {
-    _stage = DroneShow_RTL;
+    _set_stage(DroneShow_RTL);
 
-    gcs().send_text(MAV_SEVERITY_INFO, "Return to land");
+    gcs().send_text(MAV_SEVERITY_INFO, "Return to home");
 
-    // call regular rtl flight mode initialisation and ask it to ignore checks
+    // call regular RTL flight mode initialisation and ask it to ignore checks
     copter.mode_rtl.init(/* ignore_checks = */ true);
 }
 
@@ -224,7 +571,7 @@ void ModeDroneShow::rtl_run()
 
 // returns whether the RTL operation has finished successfully. Must be called
 // from the RTL stage only.
-bool ModeDroneShow::rtl_completed()
+bool ModeDroneShow::rtl_completed() const
 {
     if (_stage == DroneShow_RTL) {
         return (
@@ -237,114 +584,120 @@ bool ModeDroneShow::rtl_completed()
     }
 }
 
+// starts the phase where we are holding our position indefinitely; this happens
+// when we exited show mode and then entered it again while in the air
+void ModeDroneShow::loiter_start()
+{
+    _set_stage(DroneShow_Loiter);
+
+    // call regular position hold flight mode initialisation
+    copter.mode_loiter.init(true);
+
+    gcs().send_text(MAV_SEVERITY_INFO, "Holding position");
+}
+
+// performs the return to landing position stage
+void ModeDroneShow::loiter_run()
+{
+    // call regular position hold flight mode run function
+    copter.mode_loiter.run();
+}
+
 // starts the phase where we have landed after a show and we do nothing any more
 void ModeDroneShow::landed_start()
 {
-    _stage = DroneShow_Landed;
+    _set_stage(DroneShow_Landed);
 
     gcs().send_text(MAV_SEVERITY_INFO, "Landed successfully");
+
+    copter.g2.drone_show_manager.notify_landed();
 }
 
 // performs the landed stage where we do nothing any more
 void ModeDroneShow::landed_run()
 {
-    // Ensure that we stay disarmed even if someone tries to arm us remotely 
+    bool has_start_time = copter.g2.drone_show_manager.has_scheduled_start_time();
+
+    // Ensure that we stay disarmed even if someone tries to arm us remotely
     if (AP::arming().is_armed()) {
         AP::arming().disarm(AP_Arming::Method::SCRIPTING);
+    }
+
+    // If the start time of the show is moved to the future, start the
+    // initialization process again
+    if (has_start_time) {
+        float time_until_start_sec = copter.g2.drone_show_manager.get_time_until_start_sec();
+
+        // The upper limit (43200 sec = 12 hours) is needed to cater for the
+        // case when the GCS sends us the _original_ start time of the show
+        // again (after landing) as it will then be interpreted in the next
+        // GPS week (since it is in the past in the current GPS week). We don't
+        // want to go back to the "waiting for start time" state in this case.
+        if (time_until_start_sec > 10.0f && time_until_start_sec <= 43200.f) {
+            initialization_start();
+        }
     }
 }
 
 // starts the error phase where we have failed to start a show and we do nothing any more
 void ModeDroneShow::error_start()
 {
-    _stage = DroneShow_Error;
-
-    // Do not change or remove this message; it is used in test cases
-    gcs().send_text(MAV_SEVERITY_CRITICAL, "Failed to start, giving up");
+    _set_stage(DroneShow_Error);
 }
 
 // performs the error stage where we do nothing any more
 void ModeDroneShow::error_run()
 {
-    // Ensure that we stay disarmed even if someone tries to arm us remotely 
+    // Ensure that we stay disarmed even if someone tries to arm us remotely
     if (AP::arming().is_armed()) {
         AP::arming().disarm(AP_Arming::Method::SCRIPTING);
     }
 }
 
-// returns the elapsed time since the start of the show, in microseconds
-int64_t ModeDroneShow::get_elapsed_time_since_start_usec() const
-{
-    if (_start_time_usec > 0) {
-        uint64_t now = AP::gps().time_epoch_usec();
-        uint64_t diff;
-        if (_start_time_usec > now) {
-            diff = _start_time_usec - now;
-            if (diff < INT64_MAX) {
-                return -diff;
-            } else {
-                return INT64_MIN;
-            }
-        } else if (_start_time_usec < now) {
-            diff = now - _start_time_usec;
-            if (diff < INT64_MAX) {
-                return diff;
-            } else {
-                return INT64_MAX;
-            }
-        } else {
-            return 0;
-        }
-    } else {
-        return INT64_MIN;
-    }
-}
-
-// returns the elapsed time since the start of the show, in seconds
-float ModeDroneShow::get_elapsed_time_since_start_sec() const
-{
-    int64_t elapsed_usec = get_elapsed_time_since_start_usec();
-    return static_cast<float>(elapsed_usec / 1000) / 1000.0f;    
-}
-
-// returns the time until the start of the show, in microseconds
-int64_t ModeDroneShow::get_time_until_start_usec() const
-{
-    return -get_elapsed_time_since_start_usec();
-}
-
-// returns the time until the start of the show, in seconds
-float ModeDroneShow::get_time_until_start_sec() const
-{
-    return -get_elapsed_time_since_start_sec();
-}
-
-// Handler function that is called when the start time of the show has changed in the parameters
+// Handler function that is called when the start time of the show has changed in the
+// drone show manager
 void ModeDroneShow::notify_start_time_changed()
 {
-    uint32_t start_time_gps_msec;
-
     // Clear whether the preflight calibration was performed
     _preflight_calibration_done = false;
 
     // Clear whether the motors were started
     _motors_started = false;
-    
-    // GPS-based start time changed, let's report it and convert it to
-    // a UNIX timestamp that we can work with
-    start_time_gps_msec = _start_time_gps_sec * 1000;
-    if (AP::gps().time_week_ms() < start_time_gps_msec) {
-        // Interpret the given timestamp in the current GPS week as it is in
-        // the future even with the same GPS week number
-        _start_time_usec = AP::gps().time_epoch_convert(
-            AP::gps().time_week(), start_time_gps_msec
-        ) * 1000ULL;
-    } else {
-        // Interpret the given timestamp in the next GPS week as it is in
-        // the past with the same GPS week number
-        _start_time_usec = AP::gps().time_epoch_convert(
-            AP::gps().time_week() + 1, start_time_gps_msec
-        ) * 1000ULL;
+
+    // Report the new start time immediately in a STATUSTEXT message
+    _next_status_report_due_at = 0;
+}
+
+// Sends a guided mode command during the show performance, calculated from the
+// trajectory that the drone should follow
+bool ModeDroneShow::send_guided_mode_command_during_performance()
+{
+    Location loc;
+    Vector3f pos;
+    Vector3f vel;
+    // static uint8_t counter = 0;
+
+    float elapsed = copter.g2.drone_show_manager.get_elapsed_time_since_start_sec();
+
+    copter.g2.drone_show_manager.get_desired_global_position_in_cms_at_seconds(elapsed, loc);
+    copter.g2.drone_show_manager.get_desired_velocity_neu_in_cms_per_seconds_at_seconds(elapsed, vel);
+
+    if (loc.get_vector_from_origin_NEU(pos))
+    {
+        /*
+        counter++;
+        if (counter > 4) {
+            gcs().send_text(MAV_SEVERITY_INFO, "%.2f %.2f %.2f -- %.2f %.2f %.2f", pos.x, pos.y, pos.z, vel.x, vel.y, vel.z);
+        }
+        */
+
+        copter.mode_guided.set_destination_posvel(pos, vel);
+        return true;
+    }
+    else
+    {
+        // No EKF origin yet, this should not have happened
+        return false;
     }
 }
 
@@ -357,13 +710,19 @@ bool ModeDroneShow::start_motors_if_needed()
     } else if (_prevent_arming_until_msec > AP_HAL::millis()) {
         // Arming prevented because we have tried it recently
         return false;
-    } else if (AP::arming().arm(AP_Arming::Method::MAVLINK, /* do_arming_checks = */ true)) {
+    } else if (AP::arming().arm(AP_Arming::Method::SCRIPTING, /* do_arming_checks = */ true)) {
         // Started motors successfully
-        gcs().send_text(MAV_SEVERITY_INFO, "Armed successfully");
         return true;
     } else {
         // Prearm checks failed; prevent another attempt for the next second
         _prevent_arming_until_msec = AP_HAL::millis() + 1000;
         return false;
     }
+}
+
+// Sets the stage of the drone show module and synchronizes it with the DroneShowManager
+void ModeDroneShow::_set_stage(DroneShowModeStage value)
+{
+    _stage = value;
+    copter.g2.drone_show_manager.notify_drone_show_mode_entered_stage(_stage);
 }

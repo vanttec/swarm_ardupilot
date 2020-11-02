@@ -544,6 +544,11 @@ class sitl(Board):
         if cfg.options.sitl_flash_storage:
             env.CXXFLAGS += ['-DSTORAGE_USE_FLASH=1']
 
+        if cfg.options.sitl_use_sanitizers:
+            env.CFLAGS += ['-fsanitize=address,undefined']
+            env.CXXFLAGS += ['-fsanitize=address,undefined']
+            env.LDFLAGS += ['-fsanitize=address,undefined']
+
         if cfg.env.DEST_OS == 'cygwin':
             env.LIB += [
                 'winmm',
