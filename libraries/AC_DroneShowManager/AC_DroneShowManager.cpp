@@ -19,6 +19,8 @@
 
 #include <skybrush/skybrush.h>
 
+#include "DroneShowLEDFactory.h"
+
 #undef RED     // from AP_Notify/RGBLed.h
 #undef GREEN   // from AP_Notify/RGBLed.h
 #undef BLUE    // from AP_Notify/RGBLed.h
@@ -118,8 +120,18 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("START_AUTH", 5, AC_DroneShowManager, _params.authorized_to_start, 0),
 
+    // @Param: LED0_TYPE
+    // @DisplayName: Assignment of LED channel 0 to a LED output type
+    // @Description: Specifies where the output of the main LED light track of the show should be sent
+    // @Values: 0:Off, 1:MAVLink channel 0, 2:MAVLink channel 1, 3:MAVLink channel 2, 4:MAVLink channel 3, 5:SITL, 6:Servo
+    // @User: Standard
+    AP_GROUPINFO("LED0_TYPE", 6, AC_DroneShowManager, _params.led_types[0], 0),
+
     AP_GROUPEND
 };
+
+// LED factory that is used to create new RGB LED instances
+static DroneShowLEDFactory _rgb_led_factory_singleton;
 
 static bool is_safe_to_change_start_time_in_stage(DroneShowModeStage stage);
 
@@ -176,6 +188,9 @@ AC_DroneShowManager::~AC_DroneShowManager()
 
 void AC_DroneShowManager::init()
 {
+    // Get a reference to the RGB LED factory
+    _rgb_led_factory = &_rgb_led_factory_singleton;
+
     // Clear start time and authorization now; at this point the parameter
     // subsystem has already loaded back the previous value from the EEPROM so
     // we are safe to overwrite it
@@ -1049,6 +1064,8 @@ void AC_DroneShowManager::_update_lights()
     _last_rgb_led_color.blue = color.blue;
 
     if (_rgb_led) {
+        // No need to test whether the RGB values changed because the RGBLed
+        // drivers do this on their own
         _rgb_led->set_rgb(color.red, color.green, color.blue);
     }
 
@@ -1072,22 +1089,19 @@ void AC_DroneShowManager::_update_lights()
 
 void AC_DroneShowManager::_update_rgb_led_instance()
 {
-    uint8_t chan_red, chan_green, chan_blue;
-
     if (_rgb_led)
     {
+        _rgb_led->set_rgb(0, 0, 0);
+
         delete _rgb_led;
+        _rgb_led = NULL;
     }
 
-    if (
-        SRV_Channels::find_channel(SRV_Channel::k_scripting14, chan_red) &&
-        SRV_Channels::find_channel(SRV_Channel::k_scripting15, chan_green) &&
-        SRV_Channels::find_channel(SRV_Channel::k_scripting16, chan_blue)
-    ) {
-        _rgb_led = new RCOutputRGBLed(chan_red, chan_green, chan_blue);
-        if (_rgb_led == 0) {
-            hal.console->printf("Out of memory while allocating RCOutputRGBLed\n");
-        }
+    if (_rgb_led_factory) {
+        int led_type = _params.led_types[0];
+        _rgb_led = _rgb_led_factory->new_rgb_led_by_type(
+            static_cast<DroneShowLEDType>(led_type)
+        );
     }
 }
 

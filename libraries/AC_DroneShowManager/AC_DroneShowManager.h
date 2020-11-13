@@ -6,7 +6,7 @@
 #include <AP_Common/AP_Common.h>
 #include <AP_Common/Location.h>
 #include <AP_Math/AP_Math.h>
-#include <AP_Notify/RCOutputRGBLed.h>
+#include <AP_Notify/RGBLed.h>
 #include <AP_Param/AP_Param.h>
 
 struct sb_trajectory_s;
@@ -16,6 +16,8 @@ struct sb_light_program_s;
 struct sb_light_player_s;
 
 struct sb_rgb_color_s;
+
+class DroneShowLEDFactory;
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #  include <AP_HAL/utility/Socket.h>
@@ -208,6 +210,9 @@ private:
 
         // Whether the drone has been authorized to start
         AP_Int8 authorized_to_start;
+
+        // Specifies where the main LED light channel of the show should be sent
+        AP_Int8 led_types[1];
     } _params;
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
@@ -268,8 +273,11 @@ private:
     // mode_drone_show.cpp
     bool _cancel_requested;
 
+    // Factory object that can create RGBLed instances that the drone show manager will control
+    DroneShowLEDFactory* _rgb_led_factory;
+
     // RGB led that the drone show manager controls
-    RCOutputRGBLed* _rgb_led;
+    RGBLed* _rgb_led;
 
     // Last RGB color that was sent to the RGB led
     struct {
