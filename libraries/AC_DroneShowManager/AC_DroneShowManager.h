@@ -184,7 +184,7 @@ public:
 
     // Takeoff altitude; the drone attempts to take off to this altitude before
     // starting navigation
-    static constexpr float TAKEOFF_ALTITUDE_METERS = 3.0f;
+    static constexpr float TAKEOFF_ALTITUDE_METERS = 2.5f;
 
     // Takeoff speed; the drone attempts to take off with this vertical speed
     static constexpr float TAKEOFF_SPEED_METERS_PER_SEC = 1.0f;

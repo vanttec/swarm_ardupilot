@@ -1777,6 +1777,10 @@ private:
     // before takeoff.
     bool _motors_started;
 
+    // Stores the timestamp when we have changed the execution stage the
+    // last time
+    uint32_t _last_stage_change_at;
+
     // Stores when we are supposed to print the next status report as a STATUSTEXT
     // message
     uint64_t _next_status_report_due_at;
@@ -1808,6 +1812,7 @@ private:
     void takeoff_start();
     void takeoff_run();
     bool takeoff_completed() const;
+    bool takeoff_timed_out() const;
 
     void performing_start();
     void performing_run();

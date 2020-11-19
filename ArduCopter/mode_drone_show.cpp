@@ -9,6 +9,7 @@
 // Constructor.
 ModeDroneShow::ModeDroneShow(void) : Mode(),
     _stage(DroneShow_Off),
+    _last_stage_change_at(0),
     _next_status_report_due_at(0)
 {
 }
@@ -250,7 +251,7 @@ void ModeDroneShow::initialization_run()
 void ModeDroneShow::wait_for_start_time_start()
 {
     _set_stage(DroneShow_WaitForStartTime);
-    gcs().send_text(MAV_SEVERITY_INFO, "Waiting for start time of show");
+    // gcs().send_text(MAV_SEVERITY_INFO, "Waiting for start time of show");
 }
 
 // waits for the start time of the show
@@ -262,7 +263,7 @@ void ModeDroneShow::wait_for_start_time_run()
 
     // TODO(ntamas): what if cancel_requested() is true in AC_DroneShowManager?
     /*
-    uint64_t now = AP_HAL::micros64();
+    uint32_t now = AP_HAL::millis();
 
     if (now >= _next_status_report_due_at)
     {
@@ -282,11 +283,11 @@ void ModeDroneShow::wait_for_start_time_run()
 
         if (time_until_takeoff_sec > 15)
         {
-            _next_status_report_due_at = now + 5000000;
+            _next_status_report_due_at = now + 5000;
         }
         else
         {
-            _next_status_report_due_at = now + 1000000;
+            _next_status_report_due_at = now + 1000;
         }
     }
     */
@@ -311,9 +312,7 @@ void ModeDroneShow::wait_for_start_time_run()
             // takeoff authorization for this
 
             // This is copied from GCS_MAVLINK::_handle_command_preflight_calibration_baro()
-            gcs().send_text(MAV_SEVERITY_INFO, "Updating barometer calibration");
             AP::baro().update_calibration();
-            gcs().send_text(MAV_SEVERITY_INFO, "Barometer calibration complete");
 
             _preflight_calibration_done = true;
         }
@@ -360,13 +359,29 @@ void ModeDroneShow::takeoff_start()
 
     _set_stage(DroneShow_Takeoff);
 
-    // the body of this function is mostly copied from ModeGuided::do_user_takeoff_start()
-
     // notify the drone show manager that we are about to take off. The drone
     // show manager _may_ use our current position and heading as show origin
     // if no explicit show origin was set
     copter.ahrs.get_position(current_location);
     copter.g2.drone_show_manager.notify_takeoff(current_location, copter.ahrs.get_yaw());
+
+    // set speed limits on the waypoint navigation subsystem. This is copied
+    // from ModeLand::init()
+    pos_control->set_max_speed_accel_z(
+        wp_nav->get_default_speed_down(), wp_nav->get_default_speed_up(),
+        wp_nav->get_accel_z()
+    );
+    pos_control->set_correction_speed_accel_z(
+        wp_nav->get_default_speed_down(), wp_nav->get_default_speed_up(),
+        wp_nav->get_accel_z()
+    );
+
+    // initialise position and desired velocity
+    pos_control->init_z_controller();
+    pos_control->set_vel_desired_z_cms(AC_DroneShowManager::TAKEOFF_SPEED_METERS_PER_SEC * 100);
+
+    // the body of this function from here on is mostly copied from
+    // ModeGuided::do_user_takeoff_start()
 
     // set the current waypoint destination above the current position
     Location target_loc = copter.current_loc;
@@ -400,7 +415,7 @@ void ModeDroneShow::takeoff_start()
     // takeoff routine won't work without this.
     copter.set_auto_armed(true);
 
-    gcs().send_text(MAV_SEVERITY_INFO, "Taking off");
+    // gcs().send_text(MAV_SEVERITY_INFO, "Taking off");
 }
 
 // performs the takeoff stage
@@ -418,11 +433,16 @@ void ModeDroneShow::takeoff_run()
     } else if (takeoff_completed()) {
         // if the takeoff has finished, move to the "show" stage
         performing_start();
+    } else if (takeoff_timed_out()) {
+        // if the takeoff takes too long, move to the "show" stage anyway after
+        // emitting a warning
+        gcs().send_text(MAV_SEVERITY_WARNING, "Takeoff took too long");
+        performing_start();
     }
 }
 
-// returns whether the RTL operation has finished successfully. Must be called
-// from the RTL stage only.
+// returns whether the takeoff operation has finished successfully. Must be called
+// from the takeoff stage only.
 bool ModeDroneShow::takeoff_completed() const
 {
     if (_stage == DroneShow_Takeoff) {
@@ -434,10 +454,25 @@ bool ModeDroneShow::takeoff_completed() const
     }
 }
 
+// returns whether the current takeoff attempt is taking too long time
+bool ModeDroneShow::takeoff_timed_out() const
+{
+    if (_stage == DroneShow_Takeoff) {
+        return AP_HAL::millis() - _last_stage_change_at > 5000;
+    } else {
+        return false;
+    }
+}
+
 // starts the phase where we are actually performing the show
 void ModeDroneShow::performing_start()
 {
     _set_stage(DroneShow_Performing);
+
+#if LANDING_GEAR_ENABLED == ENABLED
+    // optionally retract landing gear
+    copter.landinggear.retract_after_takeoff();
+#endif
 
     // call regular guided flight mode initialisation
     copter.mode_guided.init(true);
@@ -445,7 +480,7 @@ void ModeDroneShow::performing_start()
     // initialise guided start time and position as reference for limit checking
     copter.mode_guided.limit_init_time_and_pos();
 
-    gcs().send_text(MAV_SEVERITY_INFO, "Starting show");
+    // gcs().send_text(MAV_SEVERITY_INFO, "Starting show");
 }
 
 // performs the takeoff stage
@@ -496,7 +531,7 @@ void ModeDroneShow::landing_start()
 {
     _set_stage(DroneShow_Landing);
 
-    gcs().send_text(MAV_SEVERITY_INFO, "Landing");
+    // gcs().send_text(MAV_SEVERITY_INFO, "Landing");
 
     // TODO(ntamas): set stopping point of loiter nav properly so we land as
     // close to our destination as possible
@@ -551,7 +586,7 @@ void ModeDroneShow::rtl_start()
 {
     _set_stage(DroneShow_RTL);
 
-    gcs().send_text(MAV_SEVERITY_INFO, "Return to home");
+    // gcs().send_text(MAV_SEVERITY_INFO, "Return to home");
 
     // call regular RTL flight mode initialisation and ask it to ignore checks
     copter.mode_rtl.init(/* ignore_checks = */ true);
@@ -593,7 +628,7 @@ void ModeDroneShow::loiter_start()
     // call regular position hold flight mode initialisation
     copter.mode_loiter.init(true);
 
-    gcs().send_text(MAV_SEVERITY_INFO, "Holding position");
+    // gcs().send_text(MAV_SEVERITY_INFO, "Holding position");
 }
 
 // performs the return to landing position stage
@@ -608,7 +643,7 @@ void ModeDroneShow::landed_start()
 {
     _set_stage(DroneShow_Landed);
 
-    gcs().send_text(MAV_SEVERITY_INFO, "Landed successfully");
+    // gcs().send_text(MAV_SEVERITY_INFO, "Landed successfully");
 
     copter.g2.drone_show_manager.notify_landed();
 }
@@ -724,5 +759,6 @@ bool ModeDroneShow::start_motors_if_needed()
 void ModeDroneShow::_set_stage(DroneShowModeStage value)
 {
     _stage = value;
+    _last_stage_change_at = AP_HAL::millis();
     copter.g2.drone_show_manager.notify_drone_show_mode_entered_stage(_stage);
 }

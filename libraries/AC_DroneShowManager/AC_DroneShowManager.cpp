@@ -599,6 +599,7 @@ void AC_DroneShowManager::_check_changes_in_parameters()
             _start_time_source = StartTimeSource::NONE;
         }
 
+        /*
         if (has_scheduled_start_time()) {
             gcs().send_text(
                 MAV_SEVERITY_INFO, "Start time set to %llu",
@@ -607,6 +608,7 @@ void AC_DroneShowManager::_check_changes_in_parameters()
         } else {
             gcs().send_text(MAV_SEVERITY_INFO, "Start time cleared");
         }
+        */
     }
 }
 
