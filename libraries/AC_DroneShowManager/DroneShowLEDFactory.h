@@ -3,7 +3,7 @@
 /// @file   AC_DroneShowLEDFactory.h
 /// @brief  LED factory class that creates LED instances for the drone show manager module
 
-#include <AP_Notify/RGBLed.h>
+#include "DroneShowLED.h"
 
 // Supported LED types for the drone show manager
 enum DroneShowLEDType {
@@ -27,6 +27,12 @@ enum DroneShowLEDType {
 
     // LED light is attached to servo channels
     DroneShowLEDType_Servo = 6,
+
+    // LED light is to be forwarded to a NeoPixel LED strip
+    DroneShowLEDType_NeoPixel = 7,
+
+    // LED light is to be forwarded to a ProfiLED LED strip
+    DroneShowLEDType_ProfiLED = 8
 };
 
 class DroneShowLEDFactory
@@ -39,7 +45,8 @@ public:
     DroneShowLEDFactory &operator=(const DroneShowLEDFactory&) = delete;
 
     /**
-     * Creates a new RGBLed instance, given the LED type.
+     * Creates a new DroneShowLED instance, given the LED type and the number of
+     * LEDs on this channel (for NeoPixel or ProfiLED strips).
      */
-    RGBLed* new_rgb_led_by_type(DroneShowLEDType type);
+    DroneShowLED* new_rgb_led_by_type(DroneShowLEDType type, uint8_t num_leds);
 };

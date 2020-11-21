@@ -18,6 +18,7 @@ struct sb_light_player_s;
 struct sb_rgb_color_s;
 
 class DroneShowLEDFactory;
+class DroneShowLED;
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #  include <AP_HAL/utility/Socket.h>
@@ -211,8 +212,13 @@ private:
         // Whether the drone has been authorized to start
         AP_Int8 authorized_to_start;
 
-        // Specifies where the main LED light channel of the show should be sent
-        AP_Int8 led_types[1];
+        struct {
+            // Specifies where the a given LED light channel of the show should be sent
+            AP_Int8 type;
+
+            // Specifies the number of LEDs on a LED strip at the given channel; used only for NeoPixel or ProfiLED types
+            AP_Int8 count;
+        } led_specs[1];
     } _params;
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
@@ -277,7 +283,7 @@ private:
     DroneShowLEDFactory* _rgb_led_factory;
 
     // RGB led that the drone show manager controls
-    RGBLed* _rgb_led;
+    DroneShowLED* _rgb_led;
 
     // Last RGB color that was sent to the RGB led
     struct {
