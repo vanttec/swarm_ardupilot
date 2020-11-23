@@ -123,14 +123,13 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Param: LED0_TYPE
     // @DisplayName: Assignment of LED channel 0 to a LED output type
     // @Description: Specifies where the output of the main LED light track of the show should be sent
-    // @Values: 0:Off, 1:MAVLink channel 0, 2:MAVLink channel 1, 3:MAVLink channel 2, 4:MAVLink channel 3, 5:SITL, 6:Servo, 7:NeoPixel, 8:ProfiLED
+    // @Values: 0:Off, 1:MAVLink channel 0, 2:MAVLink channel 1, 3:MAVLink channel 2, 4:MAVLink channel 3, 5:SITL, 6:Servo, 7:NeoPixel, 8:ProfiLED, 9:Debug
     // @User: Standard
     AP_GROUPINFO("LED0_TYPE", 6, AC_DroneShowManager, _params.led_specs[0].type, 0),
 
     // @Param: LED0_COUNT
     // @DisplayName: Number of individual LEDs on a LED channel
     // @Description: Specifies how many LEDs there are on a NeoPixel or ProfiLED LED strip
-    // @Values: 0:Off, 1:MAVLink channel 0, 2:MAVLink channel 1, 3:MAVLink channel 2, 4:MAVLink channel 3, 5:SITL, 6:Servo, 7:NeoPixel, 8:ProfiLED
     // @User: Standard
     AP_GROUPINFO("LED0_COUNT", 7, AC_DroneShowManager, _params.led_specs[0].count, 16),
 

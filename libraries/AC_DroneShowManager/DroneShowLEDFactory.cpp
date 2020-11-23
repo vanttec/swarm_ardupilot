@@ -6,6 +6,7 @@
 #include <AP_Notify/SITL_SFML_LED.h>
 #include <SRV_Channel/SRV_Channel.h>
 
+#include "DroneShowLED_Debug.h"
 #include "DroneShowLED_MAVLink.h"
 #include "DroneShowLED_RGB.h"
 #include "DroneShowLED_SerialLED.h"
@@ -55,11 +56,15 @@ DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(DroneShowLEDType type, ui
             break;
 
         case DroneShowLEDType_NeoPixel:
-            result = new DroneShowLED_SerialLED(DroneShowLED_SerialLEDType_NeoPixel, 1, num_leds);
+            result = new DroneShowLED_SerialLED(DroneShowLED_SerialLEDType_NeoPixel, 7, num_leds);
             break;
 
         case DroneShowLEDType_ProfiLED:
-            result = new DroneShowLED_SerialLED(DroneShowLED_SerialLEDType_ProfiLED, 1, num_leds);
+            result = new DroneShowLED_SerialLED(DroneShowLED_SerialLEDType_ProfiLED, 7, num_leds);
+            break;
+
+        case DroneShowLEDType_Debug:
+            result = new DroneShowLED_Debug();
             break;
 
         default:

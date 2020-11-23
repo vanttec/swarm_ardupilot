@@ -32,7 +32,10 @@ enum DroneShowLEDType {
     DroneShowLEDType_NeoPixel = 7,
 
     // LED light is to be forwarded to a ProfiLED LED strip
-    DroneShowLEDType_ProfiLED = 8
+    DroneShowLEDType_ProfiLED = 8,
+
+    // Debug output; LED light RGB codes are sent as MAVLink STATUSTEXT messages
+    DroneShowLEDType_Debug = 9
 };
 
 class DroneShowLEDFactory
