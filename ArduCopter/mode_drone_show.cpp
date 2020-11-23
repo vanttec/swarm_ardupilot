@@ -222,9 +222,20 @@ void ModeDroneShow::initialization_start()
     // already set
     _prevent_arming_until_msec = 0;
 
+    // This is copied from ModeAuto::init()
+
+    // initialise waypoint and spline controller
+    wp_nav->wp_and_spline_init();
+
     // Clear the limits of the guided mode; we will use guided mode internally
     // to control the show
     copter.mode_guided.limit_clear();
+
+    // Set auto-yaw mode to HOLD -- we don't want the drone to start turning
+    // towards waypoints
+    auto_yaw.set_mode(AUTO_YAW_HOLD);
+
+    // Part from ModeAuto::init() ends here
 
     // Clear all the status information that depends on the start time
     notify_start_time_changed();
@@ -304,17 +315,25 @@ void ModeDroneShow::wait_for_start_time_run()
             loiter_start();
         }
     } else {
-        if (time_until_takeoff_sec <= 10 && !_preflight_calibration_done) {
-            // We calibrate the barometer 10 seconds before our takeoff time.
-            // This will reset the internal AGL measurement to zero.
-            //
-            // Preflight calibration does not hurt anyone so we don't need the
-            // takeoff authorization for this
+        if (time_until_takeoff_sec <= 10) {
+            if (!_preflight_calibration_done) {
+                // We calibrate the barometer 10 seconds before our takeoff time.
+                // This will reset the internal AGL measurement to zero.
+                //
+                // Preflight calibration does not hurt anyone so we don't need the
+                // takeoff authorization for this
 
-            // This is copied from GCS_MAVLINK::_handle_command_preflight_calibration_baro()
-            AP::baro().update_calibration();
+                // This is copied from GCS_MAVLINK::_handle_command_preflight_calibration_baro()
+                // gcs().send_text(MAV_SEVERITY_INFO, "Updating calibration");
+                AP::baro().update_calibration();
+                // gcs().send_text(MAV_SEVERITY_INFO, "Barometer calibrated");
 
-            _preflight_calibration_done = true;
+                _preflight_calibration_done = true;
+            }
+        } else {
+            // We still have plenty of time until takeoff so note that we haven't
+            // done the preflight calibration yet.
+            _preflight_calibration_done = false;
         }
 
         // For the remaining parts, we need takeoff authorization
@@ -355,18 +374,39 @@ void ModeDroneShow::wait_for_start_time_run()
 // starts the phase where we are taking off at the start of the show
 void ModeDroneShow::takeoff_start()
 {
-    Location current_location;
+    Location current_loc(copter.current_loc);
+    int32_t current_alt;
 
+    // check whether the drone knows its own position
+    if (!copter.current_loc.initialised())
+    {
+        // This should not happen, but nevertheless let's move to the
+        // error state if we don't know where we are
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Failed to take off, no known location");
+        error_start();
+        return;
+    }
+
+    // get current altitude above home because the home is not necessarily at
+    // the place where we are currently taking off
+    if (!current_loc.get_alt_cm(Location::AltFrame::ABOVE_HOME, current_alt)) {
+        AP::logger().Write_Error(LogErrorSubsystem::NAVIGATION, LogErrorCode::FAILED_TO_SET_DESTINATION);
+        error_start();
+        return;
+    }
+
+    // now that we are past the basic checks, we can commit ourselves to entering
+    // takeoff mode
     _set_stage(DroneShow_Takeoff);
 
     // notify the drone show manager that we are about to take off. The drone
     // show manager _may_ use our current position and heading as show origin
     // if no explicit show origin was set
-    copter.ahrs.get_position(current_location);
-    copter.g2.drone_show_manager.notify_takeoff(current_location, copter.ahrs.get_yaw());
+    copter.g2.drone_show_manager.notify_takeoff(current_loc, copter.ahrs.get_yaw());
 
     // set speed limits on the waypoint navigation subsystem. This is copied
     // from ModeLand::init()
+    /*
     pos_control->set_max_speed_accel_z(
         wp_nav->get_default_speed_down(), wp_nav->get_default_speed_up(),
         wp_nav->get_accel_z()
@@ -375,18 +415,21 @@ void ModeDroneShow::takeoff_start()
         wp_nav->get_default_speed_down(), wp_nav->get_default_speed_up(),
         wp_nav->get_accel_z()
     );
+    */
 
     // initialise position and desired velocity
+    /*
     pos_control->init_z_controller();
     pos_control->set_vel_desired_z_cms(AC_DroneShowManager::TAKEOFF_SPEED_METERS_PER_SEC * 100);
+    */
 
     // the body of this function from here on is mostly copied from
-    // ModeGuided::do_user_takeoff_start()
+    // ModeAuto::takeoff_start()
 
     // set the current waypoint destination above the current position
-    Location target_loc = copter.current_loc;
+    Location target_loc(current_loc);
     target_loc.set_alt_cm(
-        AC_DroneShowManager::TAKEOFF_ALTITUDE_METERS * 100.0f,
+        current_alt + AC_DroneShowManager::TAKEOFF_ALTITUDE_METERS * 100.0f,
         Location::AltFrame::ABOVE_HOME
     );
 
