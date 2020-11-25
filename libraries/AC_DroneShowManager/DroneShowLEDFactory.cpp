@@ -16,27 +16,17 @@ DroneShowLEDFactory::DroneShowLEDFactory()
 {
 }
 
-DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(DroneShowLEDType type, uint8_t num_leds) {
+DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(DroneShowLEDType type, uint8_t channel, uint8_t num_leds) {
     uint8_t chan_red, chan_green, chan_blue;
     RGBLed* rgb_led = NULL;
 
     DroneShowLED* result = NULL;
 
     switch (type) {
-        case DroneShowLEDType_MAVLink_Channel0:
-            result = new DroneShowLED_MAVLink(MAVLINK_COMM_0);
-            break;
-
-        case DroneShowLEDType_MAVLink_Channel1:
-            result = new DroneShowLED_MAVLink(MAVLINK_COMM_1);
-            break;
-
-        case DroneShowLEDType_MAVLink_Channel2:
-            result = new DroneShowLED_MAVLink(MAVLINK_COMM_2);
-            break;
-
-        case DroneShowLEDType_MAVLink_Channel3:
-            result = new DroneShowLED_MAVLink(MAVLINK_COMM_3);
+        case DroneShowLEDType_MAVLink:
+            if (channel < 4) {
+                result = new DroneShowLED_MAVLink(channel + MAVLINK_COMM_0);
+            }
             break;
             
         case DroneShowLEDType_SITL:
@@ -56,11 +46,11 @@ DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(DroneShowLEDType type, ui
             break;
 
         case DroneShowLEDType_NeoPixel:
-            result = new DroneShowLED_SerialLED(DroneShowLED_SerialLEDType_NeoPixel, 7, num_leds);
+            result = new DroneShowLED_SerialLED(DroneShowLED_SerialLEDType_NeoPixel, channel, num_leds);
             break;
 
         case DroneShowLEDType_ProfiLED:
-            result = new DroneShowLED_SerialLED(DroneShowLED_SerialLEDType_ProfiLED, 7, num_leds);
+            result = new DroneShowLED_SerialLED(DroneShowLED_SerialLEDType_ProfiLED, channel, num_leds);
             break;
 
         case DroneShowLEDType_Debug:

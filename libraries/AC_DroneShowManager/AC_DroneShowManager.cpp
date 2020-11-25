@@ -64,9 +64,9 @@ namespace Colors {
     static const sb_rgb_color_t RED = { 255, 0, 0 };
     static const sb_rgb_color_t YELLOW = { 255, 255, 0 };
     static const sb_rgb_color_t GREEN = { 0, 255, 0 };
-    static const sb_rgb_color_t GREEN_DIM = { 0, 50, 0 };
+    static const sb_rgb_color_t GREEN_DIM = { 0, 128, 0 };
     static const sb_rgb_color_t ORANGE = { 255, 128, 0 };
-    static const sb_rgb_color_t WHITE_DIM = { 50, 50, 50 };
+    static const sb_rgb_color_t WHITE_DIM = { 128, 128, 128 };
     static const sb_rgb_color_t LIGHT_BLUE = { 0, 128, 255 };
     static const sb_rgb_color_t WHITE = { 255, 255, 255 };
 };
@@ -126,6 +126,12 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Values: 0:Off, 1:MAVLink channel 0, 2:MAVLink channel 1, 3:MAVLink channel 2, 4:MAVLink channel 3, 5:SITL, 6:Servo, 7:NeoPixel, 8:ProfiLED, 9:Debug
     // @User: Standard
     AP_GROUPINFO("LED0_TYPE", 6, AC_DroneShowManager, _params.led_specs[0].type, 0),
+
+    // @Param: LED0_CHAN
+    // @DisplayName: PWM or MAVLink channel to use for the LED output
+    // @Description: PWM channel to use for the LED output (1-based) if the LED type is "NeoPixel" or "ProfiLED", or the MAVLink channel to use if the LEF type is "MAVLink"
+    // @User: Standard
+    AP_GROUPINFO("LED0_CHAN", 8, AC_DroneShowManager, _params.led_specs[0].channel, 0),
 
     // @Param: LED0_COUNT
     // @DisplayName: Number of individual LEDs on a LED channel
@@ -897,6 +903,7 @@ void AC_DroneShowManager::_update_lights()
     // from Copter.cpp after the construction of AC_DroneShowManager.cpp instead.
     const uint32_t MODE_RTL = 6, MODE_SMART_RTL = 21, MODE_LAND = 9, MODE_DRONE_SHOW = 127;
     sb_rgb_color_t color = Colors::BLACK;
+    bool light_should_be_dim = true;
     uint8_t pattern = 0b11111111;
     const uint8_t BLINK = 0b11110000;
     const uint8_t BLINK_TWICE_PER_SECOND = 0b11001100;
@@ -955,6 +962,9 @@ void AC_DroneShowManager::_update_lights()
     } else if (AP_Notify::flags.flying) {
         uint32_t mode = gcs().custom_mode();
 
+        // If we are flying, we don't want to dim the LED light
+        light_should_be_dim = false;
+
         if (IS_RTL(mode)) {
             // If we are flying and we are in RTL or smart RTL mode, blink with orange color
             color = Colors::ORANGE;
@@ -978,8 +988,8 @@ void AC_DroneShowManager::_update_lights()
                 color = Colors::WHITE_DIM;
             }
         } else {
-            // Otherwise, show a dim white color so we can see the drone from the ground
-            color = Colors::WHITE_DIM;
+            // Otherwise, show a bright white color so we can see the drone from the ground
+            color = Colors::WHITE;
         }
     } else if (AP::motors()->get_spool_state() != AP_Motors::SpoolState::SHUT_DOWN) {
         uint32_t mode = gcs().custom_mode();
@@ -997,6 +1007,7 @@ void AC_DroneShowManager::_update_lights()
             elapsed_time = get_elapsed_time_since_start_sec();
             if (elapsed_time >= 0) {
                 get_color_of_rgb_light_at_seconds(elapsed_time, &color);
+                light_should_be_dim = false;
             } else {
                 color = Colors::GREEN;
                 pattern = BLINK_TWICE_PER_SECOND;
@@ -1032,10 +1043,11 @@ void AC_DroneShowManager::_update_lights()
             // synced to GPS
 
             if (has_authorization_to_start()) {
-                color = Colors::GREEN;
                 if (get_time_until_takeoff_sec() > 10) {
+                    color = Colors::GREEN_DIM;
                     pulse = 0.5;
                 } else {
+                    color = Colors::GREEN;
                     pattern = FLASH_TWICE_PER_SECOND;
                 }
             } else {
@@ -1065,6 +1077,13 @@ void AC_DroneShowManager::_update_lights()
         {
             color = Colors::BLACK;
         }
+    }
+
+    if (light_should_be_dim) {
+        // Dim the lights if we are on the ground
+        color.red >>= 1;
+        color.green >>= 1;
+        color.blue >>= 1; 
     }
 
     _last_rgb_led_color.red = color.red;
@@ -1107,10 +1126,11 @@ void AC_DroneShowManager::_update_rgb_led_instance()
 
     if (_rgb_led_factory) {
         int led_type = _params.led_specs[0].type;
+        uint8_t channel = _params.led_specs[0].channel;
         uint8_t num_leds = _params.led_specs[0].count;
 
         _rgb_led = _rgb_led_factory->new_rgb_led_by_type(
-            static_cast<DroneShowLEDType>(led_type), num_leds
+            static_cast<DroneShowLEDType>(led_type), channel, num_leds
         );
     }
 }

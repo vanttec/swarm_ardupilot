@@ -216,6 +216,8 @@ private:
             // Specifies where the a given LED light channel of the show should be sent
             AP_Int8 type;
 
+            AP_Int8 channel;
+            
             // Specifies the number of LEDs on a LED strip at the given channel; used only for NeoPixel or ProfiLED types
             AP_Int8 count;
         } led_specs[1];
