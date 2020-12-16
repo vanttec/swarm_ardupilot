@@ -206,8 +206,16 @@ void Copter::init_ardupilot()
         enable_motor_output();
     }
 
+    enum Mode::Number initial_mode = (enum Mode::Number)g.initial_mode.get();
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // switch to show mode if needed
+    if (g2.drone_show_manager.should_switch_to_show_mode_at_boot()) {
+        initial_mode = Mode::Number::DRONE_SHOW;
+    }
+#endif
+
     // attempt to set the intial_mode, else set to STABILIZE
-    if (!set_mode((enum Mode::Number)g.initial_mode.get(), ModeReason::INITIALISED)) {
+    if (!set_mode(initial_mode, ModeReason::INITIALISED)) {
         // set mode to STABILIZE will trigger mode change notification to pilot
         set_mode(Mode::Number::STABILIZE, ModeReason::UNAVAILABLE);
         AP_Notify::events.user_mode_change_failed = 1;

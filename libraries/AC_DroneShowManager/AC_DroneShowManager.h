@@ -168,6 +168,10 @@ public:
     // Sends a drone show status message (wrapped in a DATA16 packet) on the given MAVLink channel
     void send_drone_show_status(const mavlink_channel_t chan) const;
 
+    // Returns whether the drone should switch to show mode automatically
+    // after boot if there is no RC input
+    bool should_switch_to_show_mode_at_boot() const;
+
     // Asks the drone show manager to schedule a start as soon as possible if
     // the show is not running yet
     void start_if_not_running();
@@ -211,6 +215,9 @@ private:
 
         // Whether the drone has been authorized to start
         AP_Int8 authorized_to_start;
+
+        // Whether the drone should boot in show mode
+        AP_Int8 boot_in_show_mode;
 
         struct {
             // Specifies where the a given LED light channel of the show should be sent

@@ -139,6 +139,14 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("LED0_COUNT", 7, AC_DroneShowManager, _params.led_specs[0].count, 16),
 
+    // @Param: MODE_BOOT
+    // @DisplayName: Start in show mode at boot
+    // @Description: Specifies whether the drone should boot in show mode. This parameter is deprecated and superseded by INITIAL_MODE.
+    // @Range: 0 1
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("MODE_BOOT", 9, AC_DroneShowManager, _params.boot_in_show_mode, 0),
+
     AP_GROUPEND
 };
 
@@ -546,6 +554,11 @@ void AC_DroneShowManager::handle_rc_start_switch()
             }
         }
     }
+}
+
+bool AC_DroneShowManager::should_switch_to_show_mode_at_boot() const
+{
+    return _params.boot_in_show_mode;
 }
 
 void AC_DroneShowManager::start_if_not_running()
