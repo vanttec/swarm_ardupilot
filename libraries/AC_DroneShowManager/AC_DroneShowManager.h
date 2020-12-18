@@ -279,7 +279,12 @@ private:
 
     // Time when the user requested a light signal, in milliseconds; zero if
     // no signal was requested.
-    uint32_t _light_signal_started_at_msec;
+    struct {
+        uint32_t started_at_msec;
+        uint16_t duration_msec;
+        bool blinking;
+        uint8_t color[3];
+    } _light_signal;
 
     // Current execution stage of the drone show mode. This is pushed here from
     // the drone show mode when the stage changes in the mode.

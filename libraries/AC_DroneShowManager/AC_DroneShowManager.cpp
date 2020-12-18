@@ -698,10 +698,29 @@ bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& m
     mavlink_led_control_t packet;
     mavlink_msg_led_control_decode(&msg, &packet);
 
-    if (packet.instance == 42 && packet.pattern == 42 && packet.custom_len == 0) {
-        // Start blinking the drone show LED
-        _light_signal_started_at_msec = AP_HAL::millis();
-        return true;
+    if (packet.instance == 42) {
+        if (packet.pattern == 42 && (packet.custom_len == 0 || packet.custom_len == 3)) {
+            _light_signal.started_at_msec = AP_HAL::millis();
+
+            if (packet.custom_len == 0) {
+                // Start blinking the drone show LED
+                _light_signal.duration_msec = 1400;
+                _light_signal.color[0] = _light_signal.color[1] = _light_signal.color[2] = 255;
+                _light_signal.blinking = true;
+            } else {
+                // Set the drone show LED to a specific color for five seconds
+                _light_signal.duration_msec = 5000;
+                _light_signal.color[0] = packet.custom_bytes[0];
+                _light_signal.color[1] = packet.custom_bytes[1];
+                _light_signal.color[2] = packet.custom_bytes[2];
+                _light_signal.blinking = false;
+            }
+
+            return true;
+        } else {
+            // Not handled by us
+            return false;
+        }
     } else {
         // Not understood
         return false;
@@ -968,20 +987,22 @@ void AC_DroneShowManager::_update_lights()
 )
 
     // If the user requested a light signal, it trumps everything.
-    if (_light_signal_started_at_msec) {
+    if (_light_signal.started_at_msec) {
         uint32_t now = AP_HAL::millis();
-        if (now < _light_signal_started_at_msec) {
+        if (now < _light_signal.started_at_msec) {
             // Something is wrong, let's just clear the light signal
-            _light_signal_started_at_msec = 0;
+            _light_signal.started_at_msec = 0;
         } else {
             // "Where are you signal" is 100 msec on, 200 msec off, five times.
-            int diff = (now - _light_signal_started_at_msec) / 100;
-            if (diff > 12 || diff < 0) {
+            uint32_t diff = (now - _light_signal.started_at_msec);
+            if (diff > _light_signal.duration_msec) {
                 // Light signal ended
-                _light_signal_started_at_msec = 0;
-            } else if (diff % 3 == 0) {
-                // Light signal is in progress and we need white now
-                color = Colors::WHITE;
+                _light_signal.started_at_msec = 0;
+            } else if (!_light_signal.blinking || ((diff / 100) % 3 == 0)) {
+                // Light signal is in progress and we need the light signal color now
+                color.red = _light_signal.color[0];
+                color.green = _light_signal.color[1];
+                color.blue = _light_signal.color[2];
             } else {
                 // Light signal is in progress and we need black now
             }
