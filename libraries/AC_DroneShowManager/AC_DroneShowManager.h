@@ -57,6 +57,11 @@ public:
         RC_SWITCH = 3     // start time was set via the RC switch action
     };
 
+    // Early initialization steps that have to be called early in the boot process
+    // to ensure we have enough memory to do them even on low-memory boards like
+    // a Pixhawk1
+    void early_init();
+
     // Initializes the drone show subsystem at boot time
     void init();
 

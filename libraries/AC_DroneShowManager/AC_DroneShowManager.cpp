@@ -31,17 +31,11 @@
 #  if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #    define HAL_BOARD_COLLMOT_DIRECTORY "./collmot"
 #  else
-#    define HAL_BOARD_COLLMOT_DIRECTORY "/collmot"
+#    define HAL_BOARD_COLLMOT_DIRECTORY "/COLLMOT"
 #  endif
 #endif
 
 #define SHOW_FILE (HAL_BOARD_COLLMOT_DIRECTORY "/show.skyb")
-
-#if HAVE_FILESYSTEM_SUPPORT && defined(HAL_BOARD_TERRAIN_DIRECTORY)
-#define AP_TERRAIN_AVAILABLE 1
-#else
-#define AP_TERRAIN_AVAILABLE 0
-#endif
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 // UDP port that the drone show manager uses to broadcast the status of the RGB light
@@ -206,6 +200,24 @@ AC_DroneShowManager::~AC_DroneShowManager()
     delete _trajectory;
 }
 
+void AC_DroneShowManager::early_init()
+{
+    // AP::FS().mkdir() apparently needs lots of free memory, see:
+    // https://github.com/ArduPilot/ardupilot/issues/16103
+    EXPECT_DELAY_MS(3000);
+
+    if (AP::FS().mkdir(HAL_BOARD_COLLMOT_DIRECTORY) < 0) {
+        if (errno == EEXIST) {
+            // Directory already exists, this is okay
+        } else {
+            hal.console->printf(
+                "Failed to create directory %s: %s (code %d)\n",
+                 HAL_BOARD_COLLMOT_DIRECTORY, strerror(errno), errno
+            );
+        }
+    }
+}
+
 void AC_DroneShowManager::init()
 {
     // Get a reference to the RGB LED factory
@@ -216,8 +228,6 @@ void AC_DroneShowManager::init()
     // we are safe to overwrite it
     _params.start_time_gps_sec = -1;
     _params.authorized_to_start = 0;
-
-    AP::FS().mkdir(HAL_BOARD_COLLMOT_DIRECTORY);
 
     _load_show_file_from_storage();
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL

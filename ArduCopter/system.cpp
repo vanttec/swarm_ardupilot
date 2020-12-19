@@ -174,8 +174,8 @@ void Copter::init_ardupilot()
 #endif
 
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
-    // initialise drone show subsystem
-    g2.drone_show_manager.init();
+    // early initialization steps of drone show subsystem
+    g2.drone_show_manager.early_init();
 #endif
 
     // initialise AP_Logger library
@@ -205,6 +205,11 @@ void Copter::init_ardupilot()
     if (arming.rc_calibration_checks(true)) {
         enable_motor_output();
     }
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // initialise drone show subsystem
+    g2.drone_show_manager.init();
+#endif
 
     enum Mode::Number initial_mode = (enum Mode::Number)g.initial_mode.get();
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
