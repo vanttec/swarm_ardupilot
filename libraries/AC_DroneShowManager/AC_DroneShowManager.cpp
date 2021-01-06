@@ -165,7 +165,8 @@ AC_DroneShowManager::AC_DroneShowManager() :
     _total_duration_sec(0),
     _cancel_requested(false),
     _rgb_led(0),
-    _rc_start_switch_blocked_until(0)
+    _rc_start_switch_blocked_until(0),
+    _boot_count(0)
 {
     AP_Param::setup_object_defaults(this, var_info);
 
@@ -220,6 +221,11 @@ void AC_DroneShowManager::early_init()
 
 void AC_DroneShowManager::init()
 {
+    // Get the boot count from the parameters
+    enum ap_var_type ptype;
+    AP_Int16* boot_count_param = static_cast<AP_Int16*>(AP_Param::find("STAT_BOOTCNT", &ptype));
+    _boot_count = boot_count_param ? (*boot_count_param) : 0;
+
     // Get a reference to the RGB LED factory
     _rgb_led_factory = &_rgb_led_factory_singleton;
 
@@ -540,7 +546,7 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
     packet[6] = flags;
     packet[7] = static_cast<uint8_t>(_stage_in_drone_show_mode) & 0x0f;
     packet[8] = gps_health;
-    packet[9] = 0; // could be used for something else, currently it is padding
+    packet[9] = _boot_count & 0x03; // upper 6 bits are unused yet
     *(( int16_t*) (packet + 10)) = encoded_elapsed_time;
 
     mavlink_msg_data16_send(

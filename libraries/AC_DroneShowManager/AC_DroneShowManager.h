@@ -309,6 +309,11 @@ private:
     // Timestamp that defines whether the RC start switch is blocked (and if so, until when)
     uint32_t _rc_start_switch_blocked_until;
 
+    // Copy of the STAT_BOOTCNT parameter value at boot; we will send the lower
+    // two bits of this value regularly in status packets to allow the GCS to
+    // detect when the drone was rebooted
+    uint16_t _boot_count;
+
     // Checks whether there were any changes in the parameters relevant to the
     // execution of the drone show. This has to be called regularly from update()
     void _check_changes_in_parameters();
