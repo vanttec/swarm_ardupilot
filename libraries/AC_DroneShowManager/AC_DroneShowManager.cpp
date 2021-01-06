@@ -304,8 +304,8 @@ void AC_DroneShowManager::get_desired_velocity_neu_in_cms_per_seconds_at_seconds
 int64_t AC_DroneShowManager::get_elapsed_time_since_start_usec() const
 {
     if (_start_time_usec > 0) {
-        // TODO(ntamas): what if we lose GPS fix? In that case, now will be
-        // zero, and we don't know what to do with that.
+        // AP::gps().time_epoch_usec() is smart enough to handle the case when
+        // the GPS fix was lost so no need to worry about loss of GPS fix here.
         uint64_t now = AP::gps().time_epoch_usec();
         uint64_t diff;
         if (_start_time_usec > now) {
@@ -671,10 +671,12 @@ void AC_DroneShowManager::_clear_start_time_if_set_by_switch()
 
 uint32_t AC_DroneShowManager::_get_gps_synced_timestamp_in_millis_for_lights() const
 {
-    // TODO(ntamas): ensure continuity if the GPS fix goes away; right now this
-    // timestamp would "jump" suddenly, which is not a big deal if we never use
-    // differences between these timestamps and we only use these through the
-    // modulo operator (which we currently do).
+    // No need to worry about loss of GPS fix; AP::gps().time_epoch_usec() is
+    // smart enough to extrapolate from the timestamp of the latest fix.
+    //
+    // Also no need to worry about overflow; AP::gps().time_epoch_usec() / 1000
+    // is too large for an uint32_t but it doesn't matter as we will truncate
+    // the high bits.
     if (_is_gps_time_ok()) {
         return AP::gps().time_epoch_usec() / 1000;
     } else {
