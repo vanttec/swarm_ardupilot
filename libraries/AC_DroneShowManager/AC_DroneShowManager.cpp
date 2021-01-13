@@ -522,6 +522,9 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
     if (has_authorization_to_start()) {
         flags |= (1 << 2);
     }
+    if (!_is_gps_time_ok()) {
+        flags |= (1 << 1);
+    }
 
     /* calculate GPS health */
     gps_health = gps.status();
@@ -707,7 +710,11 @@ bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& m
 
 bool AC_DroneShowManager::_is_gps_time_ok() const
 {
-    return AP::gps().status() >= AP_GPS::GPS_OK_FIX_2D;
+    // AP::gos().time_week() starts from zero and gets set to a non-zero value
+    // when we start receiving full time information from the GPS. It may happen
+    // that the GPS subsystem receives iTOW information from the GPS module but
+    // no week number; we deem this unreliable so we return false in this case.
+    return AP::gps().time_week() > 0;
 }
 
 bool AC_DroneShowManager::_load_show_file_from_storage()
