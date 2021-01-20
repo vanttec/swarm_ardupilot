@@ -117,7 +117,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Param: LED0_TYPE
     // @DisplayName: Assignment of LED channel 0 to a LED output type
     // @Description: Specifies where the output of the main LED light track of the show should be sent
-    // @Values: 0:Off, 1:MAVLink channel 0, 2:MAVLink channel 1, 3:MAVLink channel 2, 4:MAVLink channel 3, 5:SITL, 6:Servo, 7:NeoPixel, 8:ProfiLED, 9:Debug
+    // @Values: 0:Off, 1:MAVLink, 2:NeoPixel, 3:ProfiLED, 4:Debug, 5:SITL, 6:Servo
     // @User: Standard
     AP_GROUPINFO("LED0_TYPE", 6, AC_DroneShowManager, _params.led_specs[0].type, 0),
 
@@ -141,6 +141,14 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("MODE_BOOT", 9, AC_DroneShowManager, _params.boot_in_show_mode, 0),
 
+    // @Param: PRE_LIGHTS
+    // @DisplayName: Brightness of preflight check related lights
+    // @Description: Controls the brightness of light signals on the drone that are used to report status information when the drone is on the ground
+    // @Range: 0 4
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("PRE_LIGHTS", 10, AC_DroneShowManager, _params.preflight_light_signal_brightness, 2),
+
     AP_GROUPEND
 };
 
@@ -148,6 +156,9 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
 static DroneShowLEDFactory _rgb_led_factory_singleton;
 
 static bool is_safe_to_change_start_time_in_stage(DroneShowModeStage stage);
+static float get_modulation_factor_for_light_effect(
+    uint32_t timestamp, LightEffectType effect, uint16_t period_msec, uint16_t phase_msec
+);
 
 AC_DroneShowManager::AC_DroneShowManager() :
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
@@ -372,9 +383,9 @@ bool AC_DroneShowManager::handle_message(const mavlink_message_t& msg)
     {
         case MAVLINK_MSG_ID_LED_CONTROL:
             // The drone show LED listens on the "secret" LED ID 42 with a
-            // pattern of 42 as well. No custom payload should be submitted
-            // here. Any message that does not match this specification is
-            // handled transparently by the "core" MAVLink GCS module.
+            // pattern of 42 as well. Any message that does not match this
+            // specification is handled transparently by the "core" MAVLink
+            // GCS module.
             return _handle_led_control_message(msg);
 
         default:
@@ -698,33 +709,75 @@ bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& m
     mavlink_led_control_t packet;
     mavlink_msg_led_control_decode(&msg, &packet);
 
-    if (packet.instance == 42) {
-        if (packet.pattern == 42 && (packet.custom_len == 0 || packet.custom_len == 3)) {
-            _light_signal.started_at_msec = AP_HAL::millis();
-
-            if (packet.custom_len == 0) {
-                // Start blinking the drone show LED
-                _light_signal.duration_msec = 1400;
-                _light_signal.color[0] = _light_signal.color[1] = _light_signal.color[2] = 255;
-                _light_signal.blinking = true;
-            } else {
-                // Set the drone show LED to a specific color for five seconds
-                _light_signal.duration_msec = 5000;
-                _light_signal.color[0] = packet.custom_bytes[0];
-                _light_signal.color[1] = packet.custom_bytes[1];
-                _light_signal.color[2] = packet.custom_bytes[2];
-                _light_signal.blinking = false;
-            }
-
-            return true;
-        } else {
-            // Not handled by us
-            return false;
-        }
-    } else {
-        // Not understood
+    if (packet.instance != 42 || packet.pattern != 42) {
+        // Not handled by us
         return false;
     }
+
+    if (packet.custom_len == 0 || packet.custom_len == 3 || packet.custom_len == 5 || packet.custom_len == 6) {
+        _light_signal.started_at_msec = AP_HAL::millis();
+
+        if (packet.custom_len == 0) {
+            // Start blinking the drone show LED
+            _light_signal.duration_msec = 1400;
+            _light_signal.color[0] = _light_signal.color[1] = _light_signal.color[2] = 255;
+            _light_signal.effect = LightEffect_Blinking;
+            _light_signal.period_msec = 300;  /* 100ms on, 200ms off */
+            _light_signal.phase_msec = 0;     /* exact sync with GPS clock */
+        } else if (packet.custom_len == 3) {
+            // Set the drone show LED to a specific color for five seconds
+            _light_signal.duration_msec = 5000;
+            _light_signal.color[0] = packet.custom_bytes[0];
+            _light_signal.color[1] = packet.custom_bytes[1];
+            _light_signal.color[2] = packet.custom_bytes[2];
+            _light_signal.effect = LightEffect_Solid;
+            _light_signal.period_msec = 0;    /* doesn't matter */
+            _light_signal.phase_msec = 0;     /* doesn't matter */
+        } else if (packet.custom_len == 5) {
+            // Set the drone show LED to a specific color for a given number of
+            // milliseconds
+            _light_signal.duration_msec = packet.custom_bytes[3] + (packet.custom_bytes[4] << 8);
+            _light_signal.color[0] = packet.custom_bytes[0];
+            _light_signal.color[1] = packet.custom_bytes[1];
+            _light_signal.color[2] = packet.custom_bytes[2];
+            _light_signal.effect = LightEffect_Solid;
+            _light_signal.period_msec = 0;    /* doesn't matter */
+            _light_signal.phase_msec = 0;     /* doesn't matter */
+        } else if (packet.custom_len == 6) {
+            // Set the drone show LED to a specific color for a given number of
+            // milliseconds, modulated by a given effect
+            _light_signal.duration_msec = packet.custom_bytes[3] + (packet.custom_bytes[4] << 8);
+            _light_signal.period_msec = 5000;
+            _light_signal.color[0] = packet.custom_bytes[0];
+            _light_signal.color[1] = packet.custom_bytes[1];
+            _light_signal.color[2] = packet.custom_bytes[2];
+
+            // Reset the phase of the effect if the previous effect was of a
+            // different type, but keep the phase counter at its current value
+            if (_light_signal.effect != packet.custom_bytes[5]) {
+                bool is_effect_synced_to_gps;
+
+                if (packet.custom_bytes[5] > LightEffect_Last) {
+                    _light_signal.effect = LightEffect_Last;
+                } else {
+                    _light_signal.effect = static_cast<LightEffectType>(packet.custom_bytes[5]);
+                }
+
+                is_effect_synced_to_gps = (
+                    _light_signal.effect == LightEffect_Blinking ||
+                    _light_signal.effect == LightEffect_Off ||
+                    _light_signal.effect == LightEffect_Solid
+                );
+
+                _light_signal.phase_msec = is_effect_synced_to_gps ? 0 : get_random16() % _light_signal.period_msec;
+            }
+        }
+    } else {
+        // Not handled by us
+        return false;
+    }
+
+    return true;
 }
 
 bool AC_DroneShowManager::_is_gps_time_ok() const
@@ -960,7 +1013,7 @@ void AC_DroneShowManager::_update_lights()
     // from Copter.cpp after the construction of AC_DroneShowManager.cpp instead.
     const uint32_t MODE_RTL = 6, MODE_SMART_RTL = 21, MODE_LAND = 9, MODE_DRONE_SHOW = 127;
     sb_rgb_color_t color = Colors::BLACK;
-    bool light_should_be_dim = true;
+    bool light_signal_affected_by_brightness_setting = true;
     uint8_t pattern = 0b11111111;
     const uint8_t BLINK = 0b11110000;
     const uint8_t BLINK_TWICE_PER_SECOND = 0b11001100;
@@ -969,6 +1022,7 @@ void AC_DroneShowManager::_update_lights()
     const uint8_t FLASH_FOUR_TIMES_PER_SECOND = 0b10101010;
     float elapsed_time;
     float pulse = 0.0f;
+    float factor;
 
 #define IS_LANDING(mode) (  \
     mode == MODE_LAND ||    \
@@ -998,15 +1052,21 @@ void AC_DroneShowManager::_update_lights()
             if (diff > _light_signal.duration_msec) {
                 // Light signal ended
                 _light_signal.started_at_msec = 0;
-            } else if (!_light_signal.blinking || ((diff / 100) % 3 == 0)) {
-                // Light signal is in progress and we need the light signal color now
-                color.red = _light_signal.color[0];
-                color.green = _light_signal.color[1];
-                color.blue = _light_signal.color[2];
             } else {
-                // Light signal is in progress and we need black now
+                // Light signal is in progress
+                factor = get_modulation_factor_for_light_effect(
+                    _get_gps_synced_timestamp_in_millis_for_lights(),
+                    _light_signal.effect, _light_signal.period_msec,
+                    _light_signal.phase_msec
+                );
+                color.red = _light_signal.color[0] * factor;
+                color.green = _light_signal.color[1] * factor;
+                color.blue = _light_signal.color[2] * factor;
             }
         }
+
+        // If the user explicitly requested a light signal, do not dim it
+        light_signal_affected_by_brightness_setting = false;
     } else if (
         AP_Notify::flags.ekf_bad || AP_Notify::flags.failsafe_battery ||
         AP_Notify::flags.failsafe_gcs || AP_Notify::flags.failsafe_radio
@@ -1022,7 +1082,7 @@ void AC_DroneShowManager::_update_lights()
         uint32_t mode = gcs().custom_mode();
 
         // If we are flying, we don't want to dim the LED light
-        light_should_be_dim = false;
+        light_signal_affected_by_brightness_setting = false;
 
         if (IS_RTL(mode)) {
             // If we are flying and we are in RTL or smart RTL mode, blink with orange color
@@ -1066,7 +1126,7 @@ void AC_DroneShowManager::_update_lights()
             elapsed_time = get_elapsed_time_since_start_sec();
             if (elapsed_time >= 0) {
                 get_color_of_rgb_light_at_seconds(elapsed_time, &color);
-                light_should_be_dim = false;
+                light_signal_affected_by_brightness_setting = false;
             } else {
                 color = Colors::GREEN;
                 pattern = BLINK_TWICE_PER_SECOND;
@@ -1122,15 +1182,16 @@ void AC_DroneShowManager::_update_lights()
     if (pulse > 0) {
         // "Pulsating", "breathing" light pattern. Modulate intensity with a
         // sine wave.
-        uint32_t timestamp = _get_gps_synced_timestamp_in_millis_for_lights() % 5000;
-        float rate = pulse * 0.5f * (1 + sinf(timestamp / 5000.0f * 2.0f * M_PI));
-        color.red *= rate;
-        color.green *= rate;
-        color.blue *= rate;
+        factor = pulse * get_modulation_factor_for_light_effect(
+            _get_gps_synced_timestamp_in_millis_for_lights(),
+            LightEffect_Breathing, /* period_msec = */ 5000, /* phase_msec = */ 0
+        );
+        color.red *= factor;
+        color.green *= factor;
+        color.blue *= factor;
     } else if (pattern < 255) {
         // check the time and set the color to black if needed - this creates a
         // blinking pattern when needed
-
         uint32_t timestamp = _get_gps_synced_timestamp_in_millis_for_lights() % 1000;
         if (!(pattern & (0x80 >> (timestamp / 125))))
         {
@@ -1138,11 +1199,27 @@ void AC_DroneShowManager::_update_lights()
         }
     }
 
-    if (light_should_be_dim) {
-        // Dim the lights if we are on the ground
-        color.red >>= 1;
-        color.green >>= 1;
-        color.blue >>= 1; 
+    // Dim the lights if we are on the ground before the flight
+    if (light_signal_affected_by_brightness_setting) {
+        uint8_t shift = 0;
+        
+        if (_params.preflight_light_signal_brightness <= 0) {
+            // <= 0 = completely off, shift by 8 bits
+            shift = 8;
+        } else if (_params.preflight_light_signal_brightness == 1) {
+            // 1 = low brightness, keep the 6 MSB so the maximum is 64
+            shift = 2;
+        } else if (_params.preflight_light_signal_brightness == 2) {
+            // 2 = medium brightness, keep the 7 MSB so the maximum is 128
+            shift = 1;
+        } else {
+            // >= 2 = full brightness
+            shift = 0;
+        }
+
+        color.red >>= shift;
+        color.green >>= shift;
+        color.blue >>= shift; 
     }
 
     _last_rgb_led_color.red = color.red;
@@ -1215,6 +1292,35 @@ bool AC_DroneShowManager::_open_rgb_led_socket()
 }
 
 #endif
+
+static float get_modulation_factor_for_light_effect(
+    uint32_t timestamp, LightEffectType effect, uint16_t period_msec, uint16_t phase_msec
+) {
+    if (effect == LightEffect_Off) {
+        return 0.0;
+    } else if (effect == LightEffect_Solid || period_msec == 0) {
+        return 1.0;
+    }
+
+    timestamp = (timestamp + phase_msec) % period_msec;
+
+    switch (effect) {
+        case LightEffect_Off:
+            return 0.0;
+
+        case LightEffect_Solid:
+            return 1.0;
+
+        case LightEffect_Blinking:
+            return timestamp < period_msec / 3.0f ? 1.0 : 0.0;
+
+        case LightEffect_Breathing:
+            return 0.5f * (1 + sinf(timestamp / 5000.0f * 2.0f * M_PI));
+
+        default:
+            return 0.0;
+    }
+}
 
 static bool is_safe_to_change_start_time_in_stage(DroneShowModeStage stage) {
     return (

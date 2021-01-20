@@ -38,6 +38,15 @@ enum DroneShowModeStage {
     DroneShow_Error,
 };
 
+// Light effect type when the lights are driven from the GCS
+enum LightEffectType {
+    LightEffect_Off,
+    LightEffect_Solid,
+    LightEffect_Blinking,
+    LightEffect_Breathing,
+    LightEffect_Last = LightEffect_Breathing
+};
+
 /// @class  AC_DroneShowManager
 /// @brief  Class managing the trajectory and light program of a drone show
 class AC_DroneShowManager {
@@ -224,6 +233,9 @@ private:
         // Whether the drone should boot in show mode
         AP_Int8 boot_in_show_mode;
 
+        // Brightness of status light signals when the drone is on the ground
+        AP_Int8 preflight_light_signal_brightness;
+        
         struct {
             // Specifies where the a given LED light channel of the show should be sent
             AP_Int8 type;
@@ -282,8 +294,10 @@ private:
     struct {
         uint32_t started_at_msec;
         uint16_t duration_msec;
-        bool blinking;
         uint8_t color[3];
+        LightEffectType effect;
+        uint16_t period_msec;
+        uint16_t phase_msec;
     } _light_signal;
 
     // Current execution stage of the drone show mode. This is pushed here from
