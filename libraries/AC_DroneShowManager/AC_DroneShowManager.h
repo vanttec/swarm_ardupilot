@@ -47,6 +47,14 @@ enum LightEffectType {
     LightEffect_Last = LightEffect_Breathing
 };
 
+// Priority of light effects to allow individual requests to take precedence
+// over requests broadcast from the GCS
+enum LightEffectPriority {
+    LightEffectPriority_None = 0,
+    LightEffectPriority_Broadcast = 1,
+    LightEffectPriority_Individual = 2
+};
+
 /// @class  AC_DroneShowManager
 /// @brief  Class managing the trajectory and light program of a drone show
 class AC_DroneShowManager {
@@ -296,6 +304,7 @@ private:
         uint16_t duration_msec;
         uint8_t color[3];
         LightEffectType effect;
+        LightEffectPriority priority;
         uint16_t period_msec;
         uint16_t phase_msec;
     } _light_signal;

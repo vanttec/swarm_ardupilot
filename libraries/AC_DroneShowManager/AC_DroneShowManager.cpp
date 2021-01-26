@@ -707,6 +707,8 @@ uint32_t AC_DroneShowManager::_get_gps_synced_timestamp_in_millis_for_lights() c
 bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& msg)
 {
     mavlink_led_control_t packet;
+    LightEffectPriority priority;
+
     mavlink_msg_led_control_decode(&msg, &packet);
 
     if (packet.instance != 42 || packet.pattern != 42) {
@@ -715,7 +717,24 @@ bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& m
     }
 
     if (packet.custom_len == 0 || packet.custom_len == 3 || packet.custom_len == 5 || packet.custom_len == 6) {
+        // Individual messages take precedence over broadcast messages so we need to
+        // know whether this message is broadcast
+        priority = (packet.target_system == 0)
+            ? LightEffectPriority_Broadcast
+            : LightEffectPriority_Individual;
+        if (priority < _light_signal.priority) {
+            // Previous light signal has a higher priority, but maybe it ended already?
+            if (_light_signal.started_at_msec + _light_signal.duration_msec < AP_HAL::millis()) {
+                _light_signal.priority = LightEffectPriority_None;
+            } else {
+                // Handled but ignored by us because a higher priority effect is still
+                // playing.
+                return true;
+            }
+        }
+
         _light_signal.started_at_msec = AP_HAL::millis();
+        _light_signal.priority = priority;
 
         if (packet.custom_len == 0) {
             // Start blinking the drone show LED
@@ -771,6 +790,13 @@ bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& m
 
                 _light_signal.phase_msec = is_effect_synced_to_gps ? 0 : get_random16() % _light_signal.period_msec;
             }
+        }
+
+        // Handle zero duration; it means that we need to turn off whatever
+        // effect we have now.
+        if (_light_signal.duration_msec == 0) {
+            _light_signal.started_at_msec = 0;
+            _light_signal.effect = LightEffect_Off;
         }
     } else {
         // Not handled by us
@@ -1236,8 +1262,7 @@ void AC_DroneShowManager::_update_lights()
     if (_sock_rgb_open) {
         uint8_t data[4];
 
-        // TODO(ntamas): insert own ID as the first byte
-        data[0] = 0;
+        data[0] = mavlink_system.sysid;
         data[1] = color.red;
         data[2] = color.green;
         data[3] = color.blue;
