@@ -49,9 +49,14 @@ void ModeDroneShow::exit()
 bool ModeDroneShow::allows_arming(AP_Arming::Method method) const
 {
     return (
-        method != AP_Arming::Method::MAVLINK &&
-        copter.g2.drone_show_manager.loaded_show_data_successfully() &&
-        copter.g2.drone_show_manager.has_valid_takeoff_time()
+        // Always allow arming from GCS in case the operator wants to test
+        // the motors before takeoff. When the command does not come from the
+        // GCS, arm only if we have loaded the show and the takeoff time is
+        // valid.
+        method == AP_Arming::Method::MAVLINK || (
+            copter.g2.drone_show_manager.loaded_show_data_successfully() &&
+            copter.g2.drone_show_manager.has_valid_takeoff_time()
+        )
     );
 }
 
@@ -262,7 +267,6 @@ void ModeDroneShow::initialization_run()
 void ModeDroneShow::wait_for_start_time_start()
 {
     _set_stage(DroneShow_WaitForStartTime);
-    // gcs().send_text(MAV_SEVERITY_INFO, "Waiting for start time of show");
 }
 
 // waits for the start time of the show
@@ -324,9 +328,7 @@ void ModeDroneShow::wait_for_start_time_run()
                 // takeoff authorization for this
 
                 // This is copied from GCS_MAVLINK::_handle_command_preflight_calibration_baro()
-                // gcs().send_text(MAV_SEVERITY_INFO, "Updating calibration");
                 AP::baro().update_calibration();
-                // gcs().send_text(MAV_SEVERITY_INFO, "Barometer calibrated");
 
                 _preflight_calibration_done = true;
             }
@@ -349,7 +351,6 @@ void ModeDroneShow::wait_for_start_time_run()
                     }
                 } else {
                     // Do not change or remove this message; it is used in test cases
-                    gcs().send_text(MAV_SEVERITY_CRITICAL, "Failed to start, giving up");
                     error_start();
                 }
             }
@@ -359,7 +360,11 @@ void ModeDroneShow::wait_for_start_time_run()
                 takeoff_start();
             }
         } else {
-            // No authorization; stop the motors if we have started them
+            // No authorization; stop the motors if we have started them. Note
+            // that we don't do anything if _motors_started is false. The motors
+            // may still be running in this case, but in this case they were
+            // started by the operator with a MAVLink command for testing
+            // purposes.
             if (_motors_started) {
                 if (AP::arming().is_armed()) {
                     AP::arming().disarm(AP_Arming::Method::SCRIPTING);
