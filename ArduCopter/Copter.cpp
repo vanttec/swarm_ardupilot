@@ -524,6 +524,14 @@ void Copter::twentyfive_hz_logging()
         g2.arot.Log_Write_Autorotation();
     }
 #endif
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    // log the current state. Currently we do this only in simulation until
+    // we test that it is safe to do so in a real flight
+    Log_Write_DroneShowStatus();
+#endif
+#endif
 }
 
 // three_hz_loop - 3.3hz loop

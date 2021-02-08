@@ -66,7 +66,8 @@ bool ModeDroneShow::cancel_requested() const
 }
 
 // ModeDroneShow::run - runs the main drone show controller
-// should be called at 25hz or more
+// should be called at 25hz or more. This function is actually running at
+// 400 Hz
 void ModeDroneShow::run()
 {
     check_changes_in_parameters();

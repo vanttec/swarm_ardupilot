@@ -376,6 +376,23 @@ int64_t AC_DroneShowManager::get_elapsed_time_since_start_usec() const
     }
 }
 
+// returns the elapsed time since the start of the show, in milliseconds
+int32_t AC_DroneShowManager::get_elapsed_time_since_start_msec() const
+{
+    int64_t elapsed_usec = get_elapsed_time_since_start_usec();
+
+    // Using -INFINITY here can lead to FPEs on macOS in the SITL simulator
+    // when compiling in release mode, hence we use a large negative number
+    // representing one day
+    if (elapsed_usec <= -86400000000) {
+        return -86400000;
+    } else if (elapsed_usec >= 86400000) {
+        return 86400000;
+    } else {
+        return static_cast<int32_t>(elapsed_usec / 1000);
+    }
+}
+
 float AC_DroneShowManager::get_elapsed_time_since_start_sec() const
 {
     int64_t elapsed_usec = get_elapsed_time_since_start_usec();
@@ -546,17 +563,11 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
 
     uint8_t packet[16] = { 0x62, };
     uint8_t flags, gps_health;
-    sb_rgb_color_t color;
     float elapsed_time;
     int16_t encoded_elapsed_time;
 
     /* make sure that we can make use of MAVLink packet truncation */
     memset(packet, 0, sizeof(uint8_t));
-
-    /* convert the last RGB light color */
-    color.red = _last_rgb_led_color.red;
-    color.green = _last_rgb_led_color.green;
-    color.blue = _last_rgb_led_color.blue;
 
     /* calculate status flags */
     flags = 0;
@@ -601,7 +612,7 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
 
     /* fill the packet */
     *(( int32_t*) (packet + 0)) = _params.start_time_gps_sec;
-    *((uint16_t*) (packet + 4)) = sb_rgb_color_encode_rgb565(color);
+    *((uint16_t*) (packet + 4)) = sb_rgb_color_encode_rgb565(_last_rgb_led_color);
     packet[6] = flags;
     packet[7] = static_cast<uint8_t>(_stage_in_drone_show_mode) & 0x0f;
     packet[8] = gps_health;
@@ -1293,9 +1304,7 @@ void AC_DroneShowManager::_update_lights()
         color.blue >>= shift; 
     }
 
-    _last_rgb_led_color.red = color.red;
-    _last_rgb_led_color.green = color.green;
-    _last_rgb_led_color.blue = color.blue;
+    _last_rgb_led_color = color;
 
     if (_rgb_led) {
         // No need to test whether the RGB values changed because the RGBLed

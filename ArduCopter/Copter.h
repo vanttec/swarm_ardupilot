@@ -806,6 +806,10 @@ private:
     void Log_Write_Vehicle_Startup_Messages();
     void log_init(void);
 
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    void Log_Write_DroneShowStatus();
+#endif
+
     // mode.cpp
     bool set_mode(Mode::Number mode, ModeReason reason);
     bool set_mode(const uint8_t new_mode, const ModeReason reason) override;

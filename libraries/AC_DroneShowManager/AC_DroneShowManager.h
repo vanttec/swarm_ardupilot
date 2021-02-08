@@ -9,13 +9,13 @@
 #include <AP_Notify/RGBLed.h>
 #include <AP_Param/AP_Param.h>
 
+#include <skybrush/colors.h>
+
 struct sb_trajectory_s;
 struct sb_trajectory_player_s;
 
 struct sb_light_program_s;
 struct sb_light_player_s;
-
-struct sb_rgb_color_s;
 
 class DroneShowLEDFactory;
 class DroneShowLED;
@@ -94,7 +94,7 @@ public:
 
     // Returns the color of the LED light on the drone according to its light
     // program the given number of seconds after the start time.
-    void get_color_of_rgb_light_at_seconds(float time, struct sb_rgb_color_s* color);
+    void get_color_of_rgb_light_at_seconds(float time, sb_rgb_color_t* color);
 
     // Returns the desired position of the drone during the drone show the
     // given number of seconds after the start time, in the global coordinate
@@ -105,6 +105,9 @@ public:
     // given number of seconds after the start time, in the global NEU
     // cooordinate system, using centimeters as units.
     void get_desired_velocity_neu_in_cms_per_seconds_at_seconds(float time, Vector3f& vel);
+
+    // Returns the last color that was emitted to the RGB light
+    void get_last_rgb_led_color(sb_rgb_color_t& color) const { color = _last_rgb_led_color; }
 
     // Returns the landing time relative to the start of the show
     float get_relative_landing_time_sec() const { return _landing_time_sec; }
@@ -121,6 +124,9 @@ public:
     // Returns the number of seconds elapsed since show start, in microseconds
     int64_t get_elapsed_time_since_start_usec() const;
 
+    // Returns the number of seconds elapsed since show start, in milliseconds
+    int32_t get_elapsed_time_since_start_msec() const;
+
     // Returns the number of seconds elapsed since show start, in seconds
     float get_elapsed_time_since_start_sec() const;
 
@@ -128,6 +134,9 @@ public:
     // light signals. The timestamp is synced to GPS seconds when the drone has
     // a good GPS fix.
     uint32_t _get_gps_synced_timestamp_in_millis_for_lights() const;
+
+    // Returns the current stage that the drone show mode is in
+    DroneShowModeStage get_stage_in_drone_show_mode() const { return _stage_in_drone_show_mode; }
 
     // Returns the number of seconds left until show start, in microseconds
     int64_t get_time_until_start_usec() const;
@@ -358,11 +367,7 @@ private:
     DroneShowLED* _rgb_led;
 
     // Last RGB color that was sent to the RGB led
-    struct {
-        uint8_t red;
-        uint8_t green;
-        uint8_t blue;
-    } _last_rgb_led_color;
+    sb_rgb_color_t _last_rgb_led_color;
 
     // Timestamp that defines whether the RC start switch is blocked (and if so, until when)
     uint32_t _rc_start_switch_blocked_until;
