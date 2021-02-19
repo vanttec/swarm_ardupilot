@@ -261,22 +261,21 @@ void AC_DroneShowManager::get_color_of_rgb_light_at_seconds(float time, sb_rgb_c
 void AC_DroneShowManager::get_desired_global_position_in_cms_at_seconds(float time, Location& loc)
 {
     sb_vector3_with_yaw_t vec;
-    float offset_north, offset_east, orientation_rad;
+    float offset_north, offset_east;
 
     sb_trajectory_player_get_position_at(_trajectory_player, time, &vec);
 
-    // We have millimeters so far, need to convert X and Y to meters and
-    // Z to centimeters first
-    vec.x = vec.x / 1000.0f;
-    vec.y = vec.y / 1000.0f;
-    vec.z = vec.z / 10.0f;
+    // We need to rotate the X axis by -_orientation_rad radians so it points
+    // North. At the same time, we also flip the Y axis so it pointsEast and
+    // not West.
+    offset_north = cosf(_orientation_rad) * vec.x + sinf(_orientation_rad) * vec.y;
+    offset_east = sinf(_orientation_rad) * vec.x - cosf(_orientation_rad) * vec.y;
 
-    // Then we need to rotate the X axis by -_orientation_deg degrees so it
-    // points North. At the same time, we also flip the Y axis so it points
-    // East and not West.
-    orientation_rad = radians(_orientation_deg);
-    offset_north = cosf(orientation_rad) * vec.x + sinf(orientation_rad) * vec.y;
-    offset_east = sinf(orientation_rad) * vec.x - cosf(orientation_rad) * vec.y;
+    // We have millimeters so far, need to convert the North and East offsets
+    // to meters first. ALso, in the Z axis, we will need centimeters.
+    offset_north = offset_north / 1000.0f;
+    offset_east = offset_east / 1000.0f;
+    vec.z = vec.z / 10.0f;
 
     // Finally, we need to offset the show origin with the calculated North and
     // East offset to get a global position
@@ -295,24 +294,19 @@ void AC_DroneShowManager::get_desired_global_position_in_cms_at_seconds(float ti
 void AC_DroneShowManager::get_desired_velocity_neu_in_cms_per_seconds_at_seconds(float time, Vector3f& vel)
 {
     sb_vector3_with_yaw_t vec;
-    float orientation_rad;
 
     sb_trajectory_player_get_velocity_at(_trajectory_player, time, &vec);
 
-    // We have mm/s so far, need to convert to cm/s
-    vec.x = vec.x / 10.0f;
-    vec.y = vec.y / 10.0f;
-    vec.z = vec.z / 10.0f;
-
-    // Then we need to rotate the X axis by -_orientation_deg degrees so it
+    // We need to rotate the X axis by -_orientation_rad degrees so it
     // points North. At the same time, we also flip the Y axis so it points
     // East and not West.
-    orientation_rad = radians(_orientation_deg);
-    vel.x = cosf(orientation_rad) * vec.x + sinf(orientation_rad) * vec.y;
-    vel.y = sinf(orientation_rad) * vec.x - cosf(orientation_rad) * vec.y;
+    vec.x = cosf(_orientation_rad) * vec.x + sinf(_orientation_rad) * vec.y;
+    vec.y = sinf(_orientation_rad) * vec.x - cosf(_orientation_rad) * vec.y;
 
-    // Copy vec.z to vel.z intact
-    vel.z = vec.z;
+    // We have mm/s so far, need to convert to cm/s
+    vel.x = vec.x / 10.0f;
+    vel.y = vec.y / 10.0f;
+    vel.z = vec.z / 10.0f;
 
     // TODO(ntamas): handle yaw!
 }
@@ -443,24 +437,26 @@ void AC_DroneShowManager::notify_landed()
     // _clear_start_time_after_landing();
 }
 
-void AC_DroneShowManager::notify_takeoff(const Location& loc, float yaw)
+void AC_DroneShowManager::notify_takeoff(const Location& loc, float yaw_rad)
 {
+    if (has_explicit_show_orientation_set_by_user()) {
+        // Set orientation from parameters
+        _orientation_rad = radians(_params.orientation_deg);
+    } else {
+        // Set origin from current heading. Yaw is already in radians.
+        _orientation_rad = yaw_rad;
+    }
+    
     if (has_explicit_show_origin_set_by_user()) {
         // Set origin from parameters
         _origin_lat = static_cast<int32_t>(_params.origin_lat);
         _origin_lng = static_cast<int32_t>(_params.origin_lng);
     } else {
         // Set origin from current location
+        // TODO(ntamas): take into account the first coordinate of the
+        // trajectory -- we don't want the drone to move sideways!
         _origin_lat = loc.lat;
         _origin_lng = loc.lng;
-    }
-
-    if (has_explicit_show_orientation_set_by_user()) {
-        // Set orientation from parameters
-        _orientation_deg = _params.orientation_deg;
-    } else {
-        // Set origin from current heading
-        _orientation_deg = degrees(yaw);
     }
 }
 

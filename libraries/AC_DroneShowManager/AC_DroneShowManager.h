@@ -179,7 +179,7 @@ public:
     void notify_landed();
 
     // Notifies the drone show manager that the takeoff is about to take place; yaw angle is in radians
-    void notify_takeoff(const Location& loc, float yaw);
+    void notify_takeoff(const Location& loc, float yaw_rad);
 
     // Handler for the MAVLink CMD_USER1 message that allows the user to reload _or_ clear the show
     bool reload_or_clear_show(bool do_clear);
@@ -280,9 +280,10 @@ private:
 
     // Longitude of drone show coordinate system, in degrees
     int32_t _origin_lng;
-
-    // Orientation of drone show coordinate system, in degrees, as set in the parameters by the user
-    float _orientation_deg;
+    
+    // Orientation of drone show coordinate system, in radians. Copied from the
+    // parameters set by the user when the drone takes off.
+    float _orientation_rad;
 
     // Reason why the start time was set to the current value; used to decide whether
     // it should be cleared when the drone show mode is restarted
