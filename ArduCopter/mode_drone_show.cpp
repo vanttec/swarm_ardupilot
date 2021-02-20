@@ -774,7 +774,15 @@ bool ModeDroneShow::send_guided_mode_command_during_performance()
         }
         */
 
-        copter.mode_guided.set_destination_posvel(pos, vel);
+        if (copter.g2.drone_show_manager.is_velocity_control_enabled())
+        {
+            copter.mode_guided.set_destination_posvel(pos, vel);
+        }
+        else
+        {
+            copter.mode_guided.set_destination(pos);
+        }
+        
         return true;
     }
     else

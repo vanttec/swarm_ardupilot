@@ -38,6 +38,11 @@ enum DroneShowModeStage {
     DroneShow_Error,
 };
 
+// Enum representing the flags in the control mode bitmasp
+enum DroneShowControlModeFlag {
+    DroneShowControl_VelocityControlEnabled = 1
+};
+
 // Light effect type when the lights are driven from the GCS
 enum LightEffectType {
     LightEffect_Off,
@@ -163,6 +168,11 @@ public:
         return _takeoff_time_sec >= 0 && _landing_time_sec > _takeoff_time_sec;
     }
 
+    // Returns whether the velocity control mode is enabled
+    bool is_velocity_control_enabled() const {
+        return _params.control_mode_flags & DroneShowControl_VelocityControlEnabled;
+    }
+    
     // Returns whether a show file was identified and loaded at boot time
     bool loaded_show_data_successfully() const;
 
@@ -244,6 +254,9 @@ private:
         // Brightness of status light signals when the drone is on the ground
         AP_Int8 preflight_light_signal_brightness;
         
+        // Bitmask to set up various aspects of the control algorithm
+        AP_Int16 control_mode_flags;
+
         struct {
             // Specifies where the a given LED light channel of the show should be sent
             AP_Int8 type;
