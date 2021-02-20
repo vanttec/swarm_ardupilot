@@ -37,6 +37,9 @@
 
 #define SHOW_FILE (HAL_BOARD_COLLMOT_DIRECTORY "/show.skyb")
 
+// Smallest valid value of show AMSL. Values smaller than this are considered unset.
+#define SMALLEST_VALID_AMSL -9999999
+
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 // UDP port that the drone show manager uses to broadcast the status of the RGB light
 // when compiled with the SITL simulator. Uncomment if you need it.
@@ -81,7 +84,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
 
     // @Param: ORIGIN_LAT
     // @DisplayName: Origin (latitude)
-    // @Description: Latitude of drone show coordinate system, zero if unset
+    // @Description: Latitude of the origin of the drone show coordinate system, zero if unset
     // @Range: -900000000 900000000
     // @Increment: 1
     // @Units: 1e-7 degrees
@@ -90,12 +93,21 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
 
     // @Param: ORIGIN_LNG
     // @DisplayName: Origin (longitude)
-    // @Description: Longitude of drone show coordinate system, zero if unset
+    // @Description: Longitude of the origin of the drone show coordinate system, zero if unset
     // @Range: -1800000000 1800000000
     // @Increment: 1
     // @Units: 1e-7 degrees
     // @User: Standard
     AP_GROUPINFO("ORIGIN_LNG", 3, AC_DroneShowManager, _params.origin_lng, 0),
+
+    // @Param: ORIGIN_AMSL
+    // @DisplayName: Origin (altitude)
+    // @Description: Altitude of the origin of the drone show coordinate system, -10000000 or smaller if unset
+    // @Range: -10000000 10000000
+    // @Increment: 1
+    // @Units: mm
+    // @User: Standard
+    AP_GROUPINFO("ORIGIN_AMSL", 12, AC_DroneShowManager, _params.origin_amsl, SMALLEST_VALID_AMSL - 1),
 
     // @Param: ORIENTATION
     // @DisplayName: Orientation
@@ -295,7 +307,22 @@ void AC_DroneShowManager::get_desired_global_position_in_cms_at_seconds(float ti
     loc.zero();
     loc.lat = _origin_lat;
     loc.lng = _origin_lng;
-    loc.set_alt_cm(static_cast<int32_t>(vec.z), Location::AltFrame::ABOVE_ORIGIN);
+
+    if (_origin_amsl_is_valid) {
+        // Show is controlled in AMSL
+        loc.set_alt_cm(
+            static_cast<int32_t>(vec.z) /* [cm] */ +
+            _origin_amsl / 10.0 /* [mm] -> [cm] */,
+            Location::AltFrame::ABSOLUTE
+        );
+    } else {
+        // Show is controlled in AGL
+        loc.set_alt_cm(
+            static_cast<int32_t>(vec.z) /* [cm] */,
+            Location::AltFrame::ABOVE_ORIGIN
+        );
+    }
+
     loc.offset(offset_north, offset_east);
 }
 
@@ -400,6 +427,11 @@ bool AC_DroneShowManager::has_authorization_to_start() const
     return _params.authorized_to_start;
 }
 
+bool AC_DroneShowManager::has_explicit_show_altitude_set_by_user() const
+{
+    return _params.origin_amsl >= SMALLEST_VALID_AMSL;
+}
+
 bool AC_DroneShowManager::has_explicit_show_orientation_set_by_user() const
 {
     return _params.orientation_deg >= 0;
@@ -465,6 +497,15 @@ void AC_DroneShowManager::notify_takeoff(const Location& loc, float yaw_rad)
         // trajectory -- we don't want the drone to move sideways!
         _origin_lat = loc.lat;
         _origin_lng = loc.lng;
+    }
+
+    if (has_explicit_show_altitude_set_by_user()) {
+        _origin_amsl = _params.origin_amsl;
+        _origin_amsl_is_valid = true;
+    } else {
+        // TODO(ntamas): shall we set from the current location or shall we
+        // leave it as unset?
+        _origin_amsl_is_valid = false;
     }
 }
 

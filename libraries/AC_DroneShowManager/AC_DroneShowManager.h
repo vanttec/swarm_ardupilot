@@ -152,6 +152,9 @@ public:
     // Returns whether the drone has been authorized to start automatically by the user
     bool has_authorization_to_start() const;
 
+    // Returns whether the show altitude was set explicitly by the user
+    bool has_explicit_show_altitude_set_by_user() const;
+
     // Returns whether the show origin was set explicitly by the user
     bool has_explicit_show_origin_set_by_user() const;
 
@@ -172,7 +175,7 @@ public:
     bool is_velocity_control_enabled() const {
         return _params.control_mode_flags & DroneShowControl_VelocityControlEnabled;
     }
-    
+
     // Returns whether a show file was identified and loaded at boot time
     bool loaded_show_data_successfully() const;
 
@@ -242,6 +245,9 @@ private:
         // Longitude of drone show coordinate system, in 1e-7 degrees, as set in the parameters by the user
         AP_Int32 origin_lng;
 
+        // Altitude of drone show coordinate system above mean sea level, in millimeters, as set in the parameters by the user
+        AP_Int32 origin_amsl;
+
         // Orientation of drone show coordinate system, in degrees, as set in the parameters by the user
         AP_Float orientation_deg;
 
@@ -288,12 +294,22 @@ private:
     struct sb_light_player_s* _light_player;
     bool _light_program_valid;
 
-    // Latitude of drone show coordinate system, in degrees
+    // Latitude of drone show coordinate system, in 1e-7 degrees
     int32_t _origin_lat;
 
-    // Longitude of drone show coordinate system, in degrees
+    // Longitude of drone show coordinate system, in 1e-7 degrees
     int32_t _origin_lng;
     
+    // Altitude of the origin of the drone show coordinate system above mean
+    // sea level, in millimeters.
+    // Valid only if and only if _origin_amsL_is_valid is set to true.
+    int32_t _origin_amsl;
+
+    // Stores whether the origin of the drone show coordinate system is valid.
+    // The show is controlled in AMSL when the origin is valid, otherwise
+    // it is controlled in AGL.
+    bool _origin_amsl_is_valid;
+
     // Orientation of drone show coordinate system, in radians. Copied from the
     // parameters set by the user when the drone takes off.
     float _orientation_rad;
