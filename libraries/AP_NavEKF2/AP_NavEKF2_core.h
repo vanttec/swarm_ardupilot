@@ -951,6 +951,7 @@ private:
     uint32_t lastInnovPassTime_ms;  // last time in msec the GPS innovations passed
     uint32_t lastInnovFailTime_ms;  // last time in msec the GPS innovations failed
     bool gpsAccuracyGood;           // true when the GPS accuracy is considered to be good enough for safe flight.
+    bool gpsAccuracyGoodForAltitude;// true when the GPS accuracy is considered to be good enough for altitude estimates.
 
     // variables added for optical flow fusion
     EKF_obs_buffer_t<of_elements> storedOF;    // OF data buffer

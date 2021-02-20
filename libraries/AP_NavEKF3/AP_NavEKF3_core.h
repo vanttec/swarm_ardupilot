@@ -1157,6 +1157,7 @@ private:
     uint32_t lastInnovPassTime_ms;  // last time in msec the GPS innovations passed
     uint32_t lastInnovFailTime_ms;  // last time in msec the GPS innovations failed
     bool gpsAccuracyGood;           // true when the GPS accuracy is considered to be good enough for safe flight.
+    bool gpsAccuracyGoodForAltitude;// true when the GPS accuracy is considered to be good enough for altitude estimates.
     Vector3F gpsVelInnov;           // gps velocity innovations
     Vector3F gpsVelVarInnov;        // gps velocity innovation variances
     uint32_t gpsVelInnovTime_ms;    // system time that gps velocity innovations were recorded (to detect timeouts)

@@ -1006,7 +1006,7 @@ void NavEKF2_core::selectHeightForFusion()
         }
     } else if (frontend->_altSource == 0) {
         activeHgtSource = HGT_SOURCE_BARO;
-    } else if ((frontend->_altSource == 2) && ((imuSampleTime_ms - lastTimeGpsReceived_ms) < 500) && validOrigin && gpsAccuracyGood) {
+    } else if ((frontend->_altSource == 2) && ((imuSampleTime_ms - lastTimeGpsReceived_ms) < 500) && validOrigin && gpsAccuracyGood && gpsAccuracyGoodForAltitude) {
         activeHgtSource = HGT_SOURCE_GPS;
     } else if ((frontend->_altSource == 3) && validOrigin && rngBcnGoodToAlign) {
         activeHgtSource = HGT_SOURCE_BCN;

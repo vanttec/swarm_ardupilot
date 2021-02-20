@@ -1109,7 +1109,7 @@ void NavEKF3_core::selectHeightForFusion()
         }
     } else if (frontend->sources.getPosZSource() == AP_NavEKF_Source::SourceZ::BARO) {
         activeHgtSource = AP_NavEKF_Source::SourceZ::BARO;
-    } else if ((frontend->sources.getPosZSource() == AP_NavEKF_Source::SourceZ::GPS) && ((imuSampleTime_ms - lastTimeGpsReceived_ms) < 500) && validOrigin && gpsAccuracyGood) {
+    } else if ((frontend->sources.getPosZSource() == AP_NavEKF_Source::SourceZ::GPS) && ((imuSampleTime_ms - lastTimeGpsReceived_ms) < 500) && validOrigin && gpsAccuracyGood && gpsAccuracyGoodForAltitude) {
         activeHgtSource = AP_NavEKF_Source::SourceZ::GPS;
     } else if ((frontend->sources.getPosZSource() == AP_NavEKF_Source::SourceZ::BEACON) && validOrigin && rngBcnGoodToAlign) {
         activeHgtSource = AP_NavEKF_Source::SourceZ::BEACON;
