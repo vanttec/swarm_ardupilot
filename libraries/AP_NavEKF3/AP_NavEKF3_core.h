@@ -1050,6 +1050,7 @@ private:
     uint32_t lastInnovPassTime_ms;  // last time in msec the GPS innovations passed
     uint32_t lastInnovFailTime_ms;  // last time in msec the GPS innovations failed
     bool gpsAccuracyGood;           // true when the GPS accuracy is considered to be good enough for safe flight.
+    bool gpsAccuracyGoodForAltitude;// true when the GPS accuracy is considered to be good enough for altitude estimates.
 
     // States used for unwrapping of compass yaw error
     float innovationIncrement;
