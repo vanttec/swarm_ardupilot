@@ -711,6 +711,13 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_int_packet(const mavlink_command_i
 
     case MAV_CMD_DO_REPOSITION:
         return handle_command_int_do_reposition(packet);
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    case MAV_CMD_USER_1:
+    case MAV_CMD_USER_2:
+        return copter.g2.drone_show_manager.handle_command_int_packet(packet);
+#endif
+
     default:
         return GCS_MAVLINK::handle_command_int_packet(packet);
     }
@@ -980,14 +987,9 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
     }
 
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
-        /* User requested to clear or reload the current show file */
-    case MAV_CMD_USER_1: {
-        if (copter.g2.drone_show_manager.reload_or_clear_show(/* do_clear = */ !is_zero(packet.param1))) {
-            return MAV_RESULT_ACCEPTED;
-        } else {
-            return MAV_RESULT_FAILED;
-        }
-    }
+    case MAV_CMD_USER_1:
+    case MAV_CMD_USER_2:
+        return copter.g2.drone_show_manager.handle_command_long_packet(packet);
 #endif
 
     default:

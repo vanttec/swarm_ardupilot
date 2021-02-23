@@ -92,6 +92,16 @@ public:
     // mode_drone_show.cpp
     bool cancel_requested() const { return _cancel_requested; }
 
+    // Configures the show origin, orientation and AMSL reference in a single
+    // call. This function sets the corresponding SHOW_ parameters as if they
+    // were set with multiple PARAM_SET MAVLink commands.
+    // 
+    // The show will be controlled in AGL if the amsl argument is less than
+    // SMALLEST_VALID_AMSL, i.e. less than or equal to 
+    bool configure_show_coordinate_system(
+        int32_t lat, int32_t lon, int32_t amsl_mm, float orientation_deg
+    );
+
     // Returns the color of the LED light on the drone according to its light
     // program the given number of seconds after the start time.
     void get_color_of_rgb_light_at_seconds(float time, sb_rgb_color_t* color);
@@ -150,6 +160,12 @@ public:
     // Returns the number of seconds left until the time when we should land
     float get_time_until_landing_sec() const;
 
+    // Handles a MAVLink user command forwarded to the drone show manager by the central MAVLink handler
+    MAV_RESULT handle_command_int_packet(const mavlink_command_int_t &packet);
+
+    // Handles a MAVLink user command forwarded to the drone show manager by the central MAVLink handler
+    MAV_RESULT handle_command_long_packet(const mavlink_command_long_t &packet);
+    
     // Handles a MAVLink message forwarded to the drone show manager by the central MAVLink handler
     bool handle_message(const mavlink_message_t& msg);
 

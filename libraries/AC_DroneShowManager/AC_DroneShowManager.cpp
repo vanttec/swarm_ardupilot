@@ -40,6 +40,9 @@
 // Smallest valid value of show AMSL. Values smaller than this are considered unset.
 #define SMALLEST_VALID_AMSL -9999999
 
+// Largest valid value of show AMSL. Values smaller than this are considered invalid.
+#define LARGEST_VALID_AMSL 10000000
+
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 // UDP port that the drone show manager uses to broadcast the status of the RGB light
 // when compiled with the SITL simulator. Uncomment if you need it.
@@ -65,6 +68,7 @@ namespace Colors {
     static const sb_rgb_color_t ORANGE = { 255, 128, 0 };
     static const sb_rgb_color_t WHITE_DIM = { 128, 128, 128 };
     static const sb_rgb_color_t LIGHT_BLUE = { 0, 128, 255 };
+    static const sb_rgb_color_t MAGENTA = { 255, 0, 255 };
     static const sb_rgb_color_t WHITE = { 255, 255, 255 };
 };
 
@@ -273,6 +277,25 @@ void AC_DroneShowManager::init()
     _update_rgb_led_instance();
 }
 
+bool AC_DroneShowManager::configure_show_coordinate_system(
+    int32_t lat, int32_t lng, int32_t amsl_mm, float orientation_deg
+) {
+    if (!check_latlng(lat, lng)) {
+        return false;
+    }
+
+    if (amsl_mm >= LARGEST_VALID_AMSL) {
+        return false;
+    }
+
+    _params.origin_lat = lat;
+    _params.origin_lng = lng;
+    _params.origin_amsl = amsl_mm;
+    _params.orientation_deg = orientation_deg;
+
+    return true;
+}
+
 void AC_DroneShowManager::get_color_of_rgb_light_at_seconds(float time, sb_rgb_color_t* color)
 {
     *color = sb_light_player_get_color_at(_light_player, time < 0 || time > 86400000 ? 0 : time * 1000);
@@ -423,6 +446,120 @@ float AC_DroneShowManager::get_time_until_landing_sec() const
     return get_time_until_start_sec() + get_relative_landing_time_sec();
 }
 
+MAV_RESULT AC_DroneShowManager::handle_command_int_packet(const mavlink_command_int_t &packet)
+{
+    // If you modify anything here, try to implement the same modification(s)
+    // in the COMMAND_LONG handler as well!
+
+    switch (packet.command) {
+
+    case MAV_CMD_USER_1: {
+        // param1: command code
+        // remaining params depend on param1
+        if (is_zero(packet.param1)) {
+            // Reload current show
+            if (reload_or_clear_show(/* do_clear = */ 0)) {
+                return MAV_RESULT_ACCEPTED;
+            } else {
+                return MAV_RESULT_FAILED;
+            }
+        } else if (is_zero(packet.param1 - 1)) {
+            // Clear current show
+            if (reload_or_clear_show(/* do_clear = */ 1)) {
+                return MAV_RESULT_ACCEPTED;
+            } else {
+                return MAV_RESULT_FAILED;
+            }
+        }
+
+        // Unsupported command code
+        return MAV_RESULT_UNSUPPORTED;
+    }
+
+    case MAV_CMD_USER_2: {
+        // param1: command code
+        // remaining params depend on param1
+        if (is_zero(packet.param1)) {
+            // Set show origin, orientation and AMSL with a single command.
+            // This is supported with COMMAND_INT MAVLink packets only as we
+            // do not want to lose precision in the lat/lng direction due to
+            // float representation
+            // 
+            // param4: orientation
+            // param5 (x): latitude (degE7)
+            // param6 (y): longitude (degE7)
+            // param7 (z): AMSL (mm)
+            if (configure_show_coordinate_system(
+                packet.x, packet.y, static_cast<int32_t>(packet.z),
+                packet.param4
+            )) {
+                return MAV_RESULT_ACCEPTED;
+            } else {
+                return MAV_RESULT_FAILED;
+            }
+        }
+
+        // Unsupported command code
+        return MAV_RESULT_UNSUPPORTED;
+    }
+
+    default:
+        // Unsupported command code
+        return MAV_RESULT_UNSUPPORTED;
+    }
+}
+
+MAV_RESULT AC_DroneShowManager::handle_command_long_packet(const mavlink_command_long_t &packet)
+{
+    // If you modify anything here, try to implement the same modification(s)
+    // in the COMMAND_INT handler as well!
+
+    switch (packet.command) {
+
+    case MAV_CMD_USER_1: {
+        // param1: command code
+        // remaining params depend on param1
+        if (is_zero(packet.param1)) {
+            // Reload current show
+            if (reload_or_clear_show(/* do_clear = */ 0)) {
+                return MAV_RESULT_ACCEPTED;
+            } else {
+                return MAV_RESULT_FAILED;
+            }
+        } else if (is_zero(packet.param1 - 1)) {
+            // Clear current show
+            if (reload_or_clear_show(/* do_clear = */ 1)) {
+                return MAV_RESULT_ACCEPTED;
+            } else {
+                return MAV_RESULT_FAILED;
+            }
+        }
+
+        // Unsupported command code
+        return MAV_RESULT_UNSUPPORTED;
+    }
+
+    case MAV_CMD_USER_2: {
+        // param1: command code
+        // remaining params depend on param1
+        if (is_zero(packet.param1)) {
+            // Set show origin, orientation and AMSL with a single command.
+            // This is supported with COMMAND_INT MAVLink packets only as we
+            // do not want to lose precision in the lat/lng direction due to
+            // float representation
+            return MAV_RESULT_UNSUPPORTED;
+        }
+
+        // Unsupported command code
+        return MAV_RESULT_UNSUPPORTED;
+    }
+
+    default:
+        // Unsupported command code
+        return MAV_RESULT_UNSUPPORTED;
+    }
+}
+
 bool AC_DroneShowManager::handle_message(const mavlink_message_t& msg)
 {
     switch (msg.msgid)
@@ -518,6 +655,9 @@ void AC_DroneShowManager::notify_takeoff(const Location& loc, float yaw_rad)
 
     if (has_explicit_show_altitude_set_by_user()) {
         _origin_amsl = _params.origin_amsl;
+        if (_origin_amsl >= LARGEST_VALID_AMSL) {
+            _origin_amsl = LARGEST_VALID_AMSL;
+        }
         _origin_amsl_is_valid = true;
     } else {
         // TODO(ntamas): shall we set from the current location or shall we
@@ -1122,8 +1262,16 @@ void AC_DroneShowManager::_update_lights()
     (mode == MODE_DRONE_SHOW && _stage_in_drone_show_mode == DroneShow_RTL) \
 )
 
-    // If the user requested a light signal, it trumps everything.
-    if (_light_signal.started_at_msec) {
+    // During compass calibration, the light should be purple no matter what.
+    // Compass calibration is always requested by the user so he can rightly
+    // expect any light signal that was previously set up from the GCS to be
+    // overridden.
+    if (AP_Notify::flags.compass_cal_running) {
+        color = Colors::MAGENTA;
+        pulse = 0.5;
+    } else if (_light_signal.started_at_msec) {
+        // If the user requested a light signal, it trumps everything except
+        // the compass calibration.
         uint32_t now = AP_HAL::millis();
         if (now < _light_signal.started_at_msec) {
             // Something is wrong, let's just clear the light signal
