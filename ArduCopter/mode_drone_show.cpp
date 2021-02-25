@@ -401,6 +401,16 @@ void ModeDroneShow::takeoff_start()
         return;
     }
 
+    // check if user has set show origin and orientation and do not allow
+    // takeoff if not
+    if (!(copter.g2.drone_show_manager.has_explicit_show_origin_set_by_user() &&
+        copter.g2.drone_show_manager.has_explicit_show_orientation_set_by_user()))
+    {
+        AP::logger().Write_Error(LogErrorSubsystem::NAVIGATION, LogErrorCode::FAILED_TO_INITIALISE);
+        error_start();
+        return;
+    }
+
     // now that we are past the basic checks, we can commit ourselves to entering
     // takeoff mode
     _set_stage(DroneShow_Takeoff);
@@ -408,7 +418,7 @@ void ModeDroneShow::takeoff_start()
     // notify the drone show manager that we are about to take off. The drone
     // show manager _may_ use our current position and heading as show origin
     // if no explicit show origin was set
-    copter.g2.drone_show_manager.notify_takeoff(current_loc, copter.ahrs.get_yaw());
+    copter.g2.drone_show_manager.notify_takeoff();
 
     // set speed limits on the waypoint navigation subsystem. This is copied
     // from ModeLand::init()
@@ -783,7 +793,7 @@ bool ModeDroneShow::send_guided_mode_command_during_performance()
         {
             copter.mode_guided.set_destination(pos);
         }
-        
+
         return true;
     }
     else

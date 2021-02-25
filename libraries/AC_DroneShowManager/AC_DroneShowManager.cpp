@@ -484,7 +484,7 @@ MAV_RESULT AC_DroneShowManager::handle_command_int_packet(const mavlink_command_
             // This is supported with COMMAND_INT MAVLink packets only as we
             // do not want to lose precision in the lat/lng direction due to
             // float representation
-            // 
+            //
             // param4: orientation
             // param5 (x): latitude (degE7)
             // param6 (y): longitude (degE7)
@@ -631,26 +631,15 @@ void AC_DroneShowManager::notify_landed()
     // _clear_start_time_after_landing();
 }
 
-void AC_DroneShowManager::notify_takeoff(const Location& loc, float yaw_rad)
+void AC_DroneShowManager::notify_takeoff()
 {
     if (has_explicit_show_orientation_set_by_user()) {
-        // Set orientation from parameters
         _orientation_rad = radians(_params.orientation_deg);
-    } else {
-        // Set origin from current heading. Yaw is already in radians.
-        _orientation_rad = yaw_rad;
     }
-    
+
     if (has_explicit_show_origin_set_by_user()) {
-        // Set origin from parameters
         _origin_lat = static_cast<int32_t>(_params.origin_lat);
         _origin_lng = static_cast<int32_t>(_params.origin_lng);
-    } else {
-        // Set origin from current location
-        // TODO(ntamas): take into account the first coordinate of the
-        // trajectory -- we don't want the drone to move sideways!
-        _origin_lat = loc.lat;
-        _origin_lng = loc.lng;
     }
 
     if (has_explicit_show_altitude_set_by_user()) {
@@ -660,8 +649,6 @@ void AC_DroneShowManager::notify_takeoff(const Location& loc, float yaw_rad)
         }
         _origin_amsl_is_valid = true;
     } else {
-        // TODO(ntamas): shall we set from the current location or shall we
-        // leave it as unset?
         _origin_amsl_is_valid = false;
     }
 }
@@ -1432,7 +1419,7 @@ void AC_DroneShowManager::_update_lights()
     // Dim the lights if we are on the ground before the flight
     if (light_signal_affected_by_brightness_setting) {
         uint8_t shift = 0;
-        
+
         if (_params.preflight_light_signal_brightness <= 0) {
             // <= 0 = completely off, shift by 8 bits
             shift = 8;
@@ -1449,7 +1436,7 @@ void AC_DroneShowManager::_update_lights()
 
         color.red >>= shift;
         color.green >>= shift;
-        color.blue >>= shift; 
+        color.blue >>= shift;
     }
 
     _last_rgb_led_color = color;
@@ -1468,6 +1455,7 @@ void AC_DroneShowManager::_update_lights()
         data[1] = color.red;
         data[2] = color.green;
         data[3] = color.blue;
+
         _sock_rgb.send(data, sizeof(data));
     }
 #endif

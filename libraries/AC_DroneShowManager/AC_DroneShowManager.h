@@ -95,9 +95,9 @@ public:
     // Configures the show origin, orientation and AMSL reference in a single
     // call. This function sets the corresponding SHOW_ parameters as if they
     // were set with multiple PARAM_SET MAVLink commands.
-    // 
+    //
     // The show will be controlled in AGL if the amsl argument is less than
-    // SMALLEST_VALID_AMSL, i.e. less than or equal to 
+    // SMALLEST_VALID_AMSL, i.e. less than or equal to
     bool configure_show_coordinate_system(
         int32_t lat, int32_t lon, int32_t amsl_mm, float orientation_deg
     );
@@ -165,7 +165,7 @@ public:
 
     // Handles a MAVLink user command forwarded to the drone show manager by the central MAVLink handler
     MAV_RESULT handle_command_long_packet(const mavlink_command_long_t &packet);
-    
+
     // Handles a MAVLink message forwarded to the drone show manager by the central MAVLink handler
     bool handle_message(const mavlink_message_t& msg);
 
@@ -216,8 +216,8 @@ public:
     // Notifies the drone show manager that the drone has landed after the show
     void notify_landed();
 
-    // Notifies the drone show manager that the takeoff is about to take place; yaw angle is in radians
-    void notify_takeoff(const Location& loc, float yaw_rad);
+    // Notifies the drone show manager that the takeoff is about to take place
+    void notify_takeoff();
 
     // Handler for the MAVLink CMD_USER1 message that allows the user to reload _or_ clear the show
     bool reload_or_clear_show(bool do_clear);
@@ -284,7 +284,7 @@ private:
 
         // Brightness of status light signals when the drone is on the ground
         AP_Int8 preflight_light_signal_brightness;
-        
+
         // Bitmask to set up various aspects of the control algorithm
         AP_Int16 control_mode_flags;
 
@@ -293,7 +293,7 @@ private:
             AP_Int8 type;
 
             AP_Int8 channel;
-            
+
             // Specifies the number of LEDs on a LED strip at the given channel; used only for NeoPixel or ProfiLED types
             AP_Int8 count;
         } led_specs[1];
@@ -324,7 +324,7 @@ private:
 
     // Longitude of drone show coordinate system, in 1e-7 degrees
     int32_t _origin_lng;
-    
+
     // Altitude of the origin of the drone show coordinate system above mean
     // sea level, in millimeters.
     // Valid only if and only if _origin_amsL_is_valid is set to true.
