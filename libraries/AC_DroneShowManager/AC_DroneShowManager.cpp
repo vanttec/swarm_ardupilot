@@ -1379,10 +1379,17 @@ void AC_DroneShowManager::_update_lights()
             // synced to GPS
 
             if (has_authorization_to_start()) {
-                if (get_time_until_takeoff_sec() > 10) {
+                if (get_time_until_landing_sec() < 0) {
+                    // if we have already landed but show mode is reset from
+                    // another mode, we just keep calm with solid green
+                    color = Colors::GREEN_DIM;
+                } else if (get_time_until_takeoff_sec() > 10) {
+                    // if there is plenty of time until show start, we pulse
+                    // slowly
                     color = Colors::GREEN_DIM;
                     pulse = 0.5;
                 } else {
+                    // if show is about to start soon, flash quickly
                     color = Colors::GREEN;
                     pattern = FLASH_TWICE_PER_SECOND;
                 }
