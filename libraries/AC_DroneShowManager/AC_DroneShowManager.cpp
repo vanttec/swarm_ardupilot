@@ -631,16 +631,15 @@ void AC_DroneShowManager::notify_landed()
     // _clear_start_time_after_landing();
 }
 
-void AC_DroneShowManager::notify_takeoff()
+bool AC_DroneShowManager::notify_takeoff_attempt()
 {
-    if (has_explicit_show_orientation_set_by_user()) {
-        _orientation_rad = radians(_params.orientation_deg);
+    if (!has_explicit_show_origin_set_by_user() || !has_explicit_show_orientation_set_by_user()) {
+        return false;
     }
-
-    if (has_explicit_show_origin_set_by_user()) {
-        _origin_lat = static_cast<int32_t>(_params.origin_lat);
-        _origin_lng = static_cast<int32_t>(_params.origin_lng);
-    }
+        
+    _orientation_rad = radians(_params.orientation_deg);
+    _origin_lat = static_cast<int32_t>(_params.origin_lat);
+    _origin_lng = static_cast<int32_t>(_params.origin_lng);
 
     if (has_explicit_show_altitude_set_by_user()) {
         _origin_amsl = _params.origin_amsl;
@@ -651,6 +650,8 @@ void AC_DroneShowManager::notify_takeoff()
     } else {
         _origin_amsl_is_valid = false;
     }
+
+    return true;
 }
 
 bool AC_DroneShowManager::reload_or_clear_show(bool do_clear)

@@ -216,8 +216,9 @@ public:
     // Notifies the drone show manager that the drone has landed after the show
     void notify_landed();
 
-    // Notifies the drone show manager that the takeoff is about to take place
-    void notify_takeoff();
+    // Notifies the drone show manager that the takeoff is about to take place.
+    // The drone show manager may decide to cancel the takeoff by returning false.
+    bool notify_takeoff_attempt();
 
     // Handler for the MAVLink CMD_USER1 message that allows the user to reload _or_ clear the show
     bool reload_or_clear_show(bool do_clear);

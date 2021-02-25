@@ -393,6 +393,17 @@ void ModeDroneShow::takeoff_start()
         return;
     }
 
+    // notify the drone show manager that we are about to take off. The drone
+    // show manager _may_ cancel the takeoff if it deems that the drone is not
+    // prepared for takeoff (e.g., the show origin or orientation was not
+    // configured)
+    if (!copter.g2.drone_show_manager.notify_takeoff_attempt())
+    {
+        AP::logger().Write_Error(LogErrorSubsystem::NAVIGATION, LogErrorCode::FAILED_TO_INITIALISE);
+        error_start();
+        return;
+    }
+
     // get current altitude above home because the home is not necessarily at
     // the place where we are currently taking off
     if (!current_loc.get_alt_cm(Location::AltFrame::ABOVE_HOME, current_alt)) {
@@ -401,24 +412,9 @@ void ModeDroneShow::takeoff_start()
         return;
     }
 
-    // check if user has set show origin and orientation and do not allow
-    // takeoff if not
-    if (!(copter.g2.drone_show_manager.has_explicit_show_origin_set_by_user() &&
-        copter.g2.drone_show_manager.has_explicit_show_orientation_set_by_user()))
-    {
-        AP::logger().Write_Error(LogErrorSubsystem::NAVIGATION, LogErrorCode::FAILED_TO_INITIALISE);
-        error_start();
-        return;
-    }
-
     // now that we are past the basic checks, we can commit ourselves to entering
     // takeoff mode
     _set_stage(DroneShow_Takeoff);
-
-    // notify the drone show manager that we are about to take off. The drone
-    // show manager _may_ use our current position and heading as show origin
-    // if no explicit show origin was set
-    copter.g2.drone_show_manager.notify_takeoff();
 
     // set speed limits on the waypoint navigation subsystem. This is copied
     // from ModeLand::init()
