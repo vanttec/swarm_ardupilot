@@ -341,8 +341,8 @@ void ModeDroneShow::wait_for_start_time_run()
 
         // For the remaining parts, we need takeoff authorization
         if (copter.g2.drone_show_manager.has_authorization_to_start()) {
-            if (time_until_takeoff_sec <= 5 && !_motors_started) {
-                // We attempt to start the motors 5 seconds before our takeoff time,
+            if (time_until_takeoff_sec <= 8 && !_motors_started) {
+                // We attempt to start the motors 8 seconds before our takeoff time,
                 // and we keep on doing so until 5 seconds after the takeoff time, when
                 // we give up
                 if (time_since_takeoff_sec < latest_takeoff_attempt_after_scheduled_takeoff_time_in_seconds) {
