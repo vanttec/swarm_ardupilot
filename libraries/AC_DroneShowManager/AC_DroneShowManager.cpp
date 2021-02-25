@@ -1384,12 +1384,11 @@ void AC_DroneShowManager::_update_lights()
                     // another mode, we just keep calm with solid green
                     color = Colors::GREEN_DIM;
                 } else if (get_time_until_takeoff_sec() > 10) {
-                    // if there is plenty of time until show start, we pulse
-                    // slowly
+                    // if there is plenty of time until takeoff, we pulse slowly
                     color = Colors::GREEN_DIM;
                     pulse = 0.5;
                 } else {
-                    // if show is about to start soon, flash quickly
+                    // if we are about to take off soon, flash quickly
                     color = Colors::GREEN;
                     pattern = FLASH_TWICE_PER_SECOND;
                 }
