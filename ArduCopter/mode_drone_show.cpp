@@ -29,7 +29,10 @@ void ModeDroneShow::exit()
     // to disarm if we are in the DroneShow_WaitForStartTime unconditionally
     // (otherwise we would end up in poshold mode the next time we enter the
     // drone show mode)
-    if ((copter.ap.land_complete || _stage == DroneShow_WaitForStartTime) && motors->armed()) {
+    if (
+        (copter.ap.land_complete || _stage == DroneShow_WaitForStartTime) &&
+        motors->armed() && !AP::notify().flags.flying
+    ) {
         AP::arming().disarm(AP_Arming::Method::SCRIPTING);
     }
 
@@ -51,11 +54,14 @@ bool ModeDroneShow::allows_arming(AP_Arming::Method method) const
     return (
         // Always allow arming from GCS in case the operator wants to test
         // the motors before takeoff. When the command does not come from the
-        // GCS, arm only if we have loaded the show and the takeoff time is
-        // valid.
+        // GCS, arm only if we have loaded the show, the takeoff time is
+        // valid and we have a show origin and orientation explicitly set up
+        // by the user
         method == AP_Arming::Method::MAVLINK || (
             copter.g2.drone_show_manager.loaded_show_data_successfully() &&
-            copter.g2.drone_show_manager.has_valid_takeoff_time()
+            copter.g2.drone_show_manager.has_valid_takeoff_time() &&
+            copter.g2.drone_show_manager.has_explicit_show_origin_set_by_user() &&
+            copter.g2.drone_show_manager.has_explicit_show_orientation_set_by_user()
         )
     );
 }
@@ -276,6 +282,18 @@ void ModeDroneShow::wait_for_start_time_run()
     float time_until_takeoff_sec = copter.g2.drone_show_manager.get_time_until_takeoff_sec();
     float time_since_takeoff_sec = -time_until_takeoff_sec;
     const float latest_takeoff_attempt_after_scheduled_takeoff_time_in_seconds = 5.0f;
+
+    // This is copied from ModeStabilize::run() -- it is needed to allow the 
+    // user to turn on the motors and spin them up while idling on the ground.
+    // The part that allows unlimited throttle is removed; we allow unlimited
+    // throttle only if we somehow ended up in the air for some strange reason
+    if (!motors->armed()) {
+        motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::SHUT_DOWN);
+    } else if (AP_Notify::flags.flying) {
+        motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
+    } else {
+        motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::GROUND_IDLE);
+    }
 
     // TODO(ntamas): what if cancel_requested() is true in AC_DroneShowManager?
     /*
