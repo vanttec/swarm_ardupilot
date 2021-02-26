@@ -12,6 +12,7 @@
 #include <AP_Math/AP_Math.h>
 #include <AP_Motors/AP_Motors.h>
 #include <AP_Notify/AP_Notify.h>
+#include <AP_Notify/DroneShowNotificationBackend.h>
 #include <AP_Param/AP_Param.h>
 
 #include "AC_DroneShowManager.h"
@@ -793,6 +794,7 @@ void AC_DroneShowManager::stop_if_running()
 void AC_DroneShowManager::update()
 {
     _check_changes_in_parameters();
+    _check_events();
     _check_radio_failsafe();
     _update_lights();
 }
@@ -851,6 +853,21 @@ void AC_DroneShowManager::_check_changes_in_parameters()
     }
 }
 
+void AC_DroneShowManager::_check_events()
+{
+    DroneShowNotificationBackend* backend = DroneShowNotificationBackend::get_singleton();
+
+    if (DroneShowNotificationBackend::events.compass_cal_failed) {
+        _flash_leds_after_failure();
+    } else if (DroneShowNotificationBackend::events.compass_cal_saved) {
+        _flash_leds_after_success();
+    }
+
+    if (backend) {
+        backend->clear_events();
+    }
+}
+
 void AC_DroneShowManager::_check_radio_failsafe()
 {
     if (AP_Notify::flags.failsafe_radio) {
@@ -888,6 +905,30 @@ uint32_t AC_DroneShowManager::_get_gps_synced_timestamp_in_millis_for_lights() c
     }
 }
 
+void AC_DroneShowManager::_flash_leds_after_failure()
+{
+    _flash_leds_with_color(255, 0, 0, /* count = */ 3, LightEffectPriority_Internal);
+}
+
+void AC_DroneShowManager::_flash_leds_after_success()
+{
+    _flash_leds_with_color(0, 255, 0, /* count = */ 3, LightEffectPriority_Internal);
+}
+
+void AC_DroneShowManager::_flash_leds_with_color(uint8_t red, uint8_t green, uint8_t blue, uint8_t count, LightEffectPriority priority)
+{
+    _light_signal.started_at_msec = AP_HAL::millis();
+    _light_signal.priority = priority;
+
+    _light_signal.duration_msec = count * 300 - 200;  /* 100ms on, 200ms off */
+    _light_signal.color[0] = red;
+    _light_signal.color[1] = green;
+    _light_signal.color[2] = blue;
+    _light_signal.effect = LightEffect_Blinking;
+    _light_signal.period_msec = 300;  /* 100ms on, 200ms off */
+    _light_signal.phase_msec = 0;     /* exact sync with GPS clock */
+}
+
 bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& msg)
 {
     mavlink_led_control_t packet;
@@ -922,11 +963,7 @@ bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& m
 
         if (packet.custom_len == 0) {
             // Start blinking the drone show LED
-            _light_signal.duration_msec = 1400;
-            _light_signal.color[0] = _light_signal.color[1] = _light_signal.color[2] = 255;
-            _light_signal.effect = LightEffect_Blinking;
-            _light_signal.period_msec = 300;  /* 100ms on, 200ms off */
-            _light_signal.phase_msec = 0;     /* exact sync with GPS clock */
+            _flash_leds_with_color(255, 255, 255, /* count = */ 5, priority);
         } else if (packet.custom_len == 3) {
             // Set the drone show LED to a specific color for five seconds
             _light_signal.duration_msec = 5000;
@@ -1264,12 +1301,14 @@ void AC_DroneShowManager::_update_lights()
         if (now < _light_signal.started_at_msec) {
             // Something is wrong, let's just clear the light signal
             _light_signal.started_at_msec = 0;
+            _light_signal.priority = LightEffectPriority_None;
         } else {
             // "Where are you signal" is 100 msec on, 200 msec off, five times.
             uint32_t diff = (now - _light_signal.started_at_msec);
             if (diff > _light_signal.duration_msec) {
                 // Light signal ended
                 _light_signal.started_at_msec = 0;
+                _light_signal.priority = LightEffectPriority_None;
             } else {
                 // Light signal is in progress
                 factor = get_modulation_factor_for_light_effect(

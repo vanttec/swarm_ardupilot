@@ -52,12 +52,14 @@ enum LightEffectType {
     LightEffect_Last = LightEffect_Breathing
 };
 
-// Priority of light effects to allow individual requests to take precedence
-// over requests broadcast from the GCS
+// Priority of light effects to allow internal requests to take precedence over
+// individual user requests, and to allow individual user requests to take
+// precedence over requests broadcast from the GCS
 enum LightEffectPriority {
     LightEffectPriority_None = 0,
-    LightEffectPriority_Broadcast = 1,
-    LightEffectPriority_Individual = 2
+    LightEffectPriority_Broadcast = 1, // preferred swarm-level color sent from GCS
+    LightEffectPriority_Individual = 2, // preferred color requested individually
+    LightEffectPriority_Internal = 3 // internal light signals, e.g. compass calibration light signal
 };
 
 /// @class  AC_DroneShowManager
@@ -398,6 +400,10 @@ private:
     // execution of the drone show. This has to be called regularly from update()
     void _check_changes_in_parameters();
 
+    // Checks whether an event tracked by DroneShowNoficationBackend was triggered
+    // recently and handle it if needed
+    void _check_events();
+
     // Checks whether the radio is in failsafe state and blocks the RC start
     // switch until the radio returns from failsafe and at least one second
     // has passed
@@ -408,6 +414,17 @@ private:
 
     // Clears the start time of the drone show if it was set by the user with the RC switch
     void _clear_start_time_if_set_by_switch();
+
+    // Produces an internally triggered light signal that indicates a failed
+    // operation (like a successful compass calibration)
+    void _flash_leds_after_failure();
+    
+    // Produces an internally triggered light signal that indicates a successful
+    // operation (like a successful compass calibration)
+    void _flash_leds_after_success();
+
+    // Flashes the LEDs of the drone with the given color
+    void _flash_leds_with_color(uint8_t red, uint8_t green, uint8_t blue, uint8_t count, LightEffectPriority priority);
 
     // Handles a MAVLink LED_CONTROL message from the ground station.
     bool _handle_led_control_message(const mavlink_message_t& msg);
