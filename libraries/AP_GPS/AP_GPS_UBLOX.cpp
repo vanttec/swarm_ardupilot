@@ -1749,9 +1749,11 @@ AP_GPS_UBLOX::_save_cfg()
     _send_message(CLASS_CFG, MSG_CFG_CFG, &save_cfg, sizeof(save_cfg));
     _last_cfg_sent_time = AP_HAL::millis();
     _num_cfg_save_tries++;
+#ifdef COLLMOT_HACKS_ENTRON_300
     GCS_SEND_TEXT(MAV_SEVERITY_INFO,
                                      "GPS: u-blox %d saving config",
                                      state.instance + 1);
+#endif
 }
 
 /*
