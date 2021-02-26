@@ -22,20 +22,6 @@ bool ModeDroneShow::init(bool ignore_checks)
 
 void ModeDroneShow::exit()
 {
-    // If we haven't taken off yet, disarm the motors. Apparently
-    // copter.ap.land_complete is sometimes false when we are in the
-    // DroneShow_WaitForStartTime stage and we are in the time window where
-    // the motors were armed already but we haven't taken off yet, so we need
-    // to disarm if we are in the DroneShow_WaitForStartTime unconditionally
-    // (otherwise we would end up in poshold mode the next time we enter the
-    // drone show mode)
-    if (
-        (copter.ap.land_complete || _stage == DroneShow_WaitForStartTime) &&
-        motors->armed() && !AP::notify().flags.flying
-    ) {
-        AP::arming().disarm(AP_Arming::Method::SCRIPTING);
-    }
-
     // Clear the timestamp when we last attempted to arm the drone
     _prevent_arming_until_msec = 0;
 
@@ -289,7 +275,7 @@ void ModeDroneShow::wait_for_start_time_run()
     // throttle only if we somehow ended up in the air for some strange reason
     if (!motors->armed()) {
         motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::SHUT_DOWN);
-    } else if (AP_Notify::flags.flying) {
+    } else if (!copter.ap.land_complete) {
         motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
     } else {
         motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::GROUND_IDLE);
