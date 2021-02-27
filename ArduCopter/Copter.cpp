@@ -526,11 +526,8 @@ void Copter::twentyfive_hz_logging()
 #endif
 
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
-#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-    // log the current state. Currently we do this only in simulation until
-    // we test that it is safe to do so in a real flight
+    // log the current show state
     Log_Write_DroneShowStatus();
-#endif
 #endif
 }
 
