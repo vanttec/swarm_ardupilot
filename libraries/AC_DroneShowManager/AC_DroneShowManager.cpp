@@ -325,8 +325,6 @@ void AC_DroneShowManager::get_desired_global_position_in_cms_at_seconds(float ti
     // East offset to get a global position
 
     // TODO(ntamas): handle yaw!
-    // TODO(ntamas): figure out whether using Location::AltFrame::ABOVE_ORIGIN
-    // below for the altitude reference is okay or not
 
     loc.zero();
     loc.lat = _origin_lat;
@@ -340,10 +338,13 @@ void AC_DroneShowManager::get_desired_global_position_in_cms_at_seconds(float ti
             Location::AltFrame::ABSOLUTE
         );
     } else {
-        // Show is controlled in AGL
+        // Show is controlled in AGL. We use altitude above home because the
+        // EKF origin could be anywhere -- it is typically established early
+        // during the initialization process, while the home is set to the
+        // point where the drone is armed.
         loc.set_alt_cm(
             static_cast<int32_t>(vec.z) /* [cm] */,
-            Location::AltFrame::ABOVE_ORIGIN
+            Location::AltFrame::ABOVE_HOME
         );
     }
 

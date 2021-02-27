@@ -327,7 +327,6 @@ void ModeDroneShow::wait_for_start_time_run()
         if (time_until_takeoff_sec <= 10) {
             if (!_preflight_calibration_done) {
                 // We calibrate the barometer 10 seconds before our takeoff time.
-                // This will reset the internal AGL measurement to zero.
                 //
                 // Preflight calibration does not hurt anyone so we don't need the
                 // takeoff authorization for this
@@ -337,10 +336,22 @@ void ModeDroneShow::wait_for_start_time_run()
 
                 _preflight_calibration_done = true;
             }
+
+            if (!_home_position_set) {
+                // Update our home to the current location so we have zero AGL
+                // TODO(ntamas): to lock or not to lock?
+                if (!copter.set_home_to_current_location(/* lock = */ false)) {
+                    gcs().send_text(MAV_SEVERITY_CRITICAL, "Could not set home position, giving up");
+                    error_start();
+                } else {
+                    _home_position_set = true;
+                }
+            }
         } else {
             // We still have plenty of time until takeoff so note that we haven't
-            // done the preflight calibration yet.
+            // done the preflight calibration and haven't set the home position.
             _preflight_calibration_done = false;
+            _home_position_set = false;
         }
 
         // For the remaining parts, we need takeoff authorization
@@ -360,7 +371,7 @@ void ModeDroneShow::wait_for_start_time_run()
                 }
             }
 
-            if (time_until_takeoff_sec <= 0 && _motors_started) {
+            if (time_until_takeoff_sec <= 0 && _motors_started && _home_position_set) {
                 // Time to take off!
                 takeoff_start();
             }
@@ -419,25 +430,6 @@ void ModeDroneShow::takeoff_start()
     // now that we are past the basic checks, we can commit ourselves to entering
     // takeoff mode
     _set_stage(DroneShow_Takeoff);
-
-    // set speed limits on the waypoint navigation subsystem. This is copied
-    // from ModeLand::init()
-    /*
-    pos_control->set_max_speed_accel_z(
-        wp_nav->get_default_speed_down(), wp_nav->get_default_speed_up(),
-        wp_nav->get_accel_z()
-    );
-    pos_control->set_correction_speed_accel_z(
-        wp_nav->get_default_speed_down(), wp_nav->get_default_speed_up(),
-        wp_nav->get_accel_z()
-    );
-    */
-
-    // initialise position and desired velocity
-    /*
-    pos_control->init_z_controller();
-    pos_control->set_vel_desired_z_cms(AC_DroneShowManager::TAKEOFF_SPEED_METERS_PER_SEC * 100);
-    */
 
     // the body of this function from here on is mostly copied from
     // ModeAuto::takeoff_start()
@@ -754,6 +746,9 @@ void ModeDroneShow::notify_start_time_changed()
 {
     // Clear whether the preflight calibration was performed
     _preflight_calibration_done = false;
+
+    // Clear whether the home position was set before takeoff
+    _home_position_set = false;
 
     // Clear whether the motors were started
     _motors_started = false;

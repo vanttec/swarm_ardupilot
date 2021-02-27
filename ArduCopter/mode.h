@@ -1785,8 +1785,11 @@ private:
     // message
     uint64_t _next_status_report_due_at;
 
-    // Stores whether we have performed the preflight calibration due 15
-    // seconds before takeoff.
+    // Stores whether we have set the home position to the takeoff position
+    // before takeoff.
+    bool _home_position_set;
+
+    // Stores whether we have performed the preflight calibration before takeoff.
     bool _preflight_calibration_done;
 
     // Timestamp until we block arming attempts during the startup phase if we
