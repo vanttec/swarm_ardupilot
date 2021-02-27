@@ -712,6 +712,14 @@ struct PACKED log_PSCZ {
     float throttle_out;
 };
 
+struct PACKED log_GPSRTKPacket {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint16_t type;
+    uint16_t length;
+};
+
+
 // FMT messages define all message formats other than FMT
 // UNIT messages define units which can be referenced by FMTU messages
 // FMTU messages associate types (e.g. centimeters/second/second) to FMT message fields
@@ -1207,6 +1215,11 @@ struct PACKED log_PSCZ {
 // @Field: AZ: Acceleration Z-axis
 // @Field: ThO: Throttle output
 
+// CollMot-specific log messages
+#define LOG_COLLMOT_STRUCTURES \
+    { LOG_GPS_RTK_PACKET_MSG, sizeof(log_GPSRTKPacket), \
+      "RTK", "QHH", "TimeUS,Type,Length", "s-b", "F--" }
+
 // messages for all boards
 #define LOG_BASE_STRUCTURES \
     { LOG_FORMAT_MSG, sizeof(log_Format), \
@@ -1347,7 +1360,7 @@ LOG_STRUCTURE_FROM_VISUALODOM \
     { LOG_MSG_SBPEVENT, sizeof(log_SbpEvent), \
       "SBRE", "QHIiBB", "TimeUS,GWk,GMS,ns_residual,level,quality", "s?????", "F?????" }
 
-#define LOG_COMMON_STRUCTURES LOG_BASE_STRUCTURES, LOG_SBP_STRUCTURES
+#define LOG_COMMON_STRUCTURES LOG_BASE_STRUCTURES, LOG_SBP_STRUCTURES, LOG_COLLMOT_STRUCTURES
 
 // message types 0 to 63 reserved for vehicle specific use
 
@@ -1381,6 +1394,9 @@ enum LogMessages : uint8_t {
 
     // LOG_MODE_MSG is used as a check for duplicates. Do not add between this and LOG_FORMAT_MSG
     LOG_MODE_MSG,
+
+    // CollMot-specific messages come here, IDs decreasing from 127
+    LOG_GPS_RTK_PACKET_MSG = 127,
 
     LOG_FORMAT_MSG = 128, // this must remain #128
 
@@ -1436,7 +1452,7 @@ enum LogMessages : uint8_t {
 };
 
 static_assert(_LOG_LAST_MSG_ <= 255, "Too many message formats");
-static_assert(LOG_MODE_MSG < 128, "Duplicate message format IDs");
+static_assert(LOG_MODE_MSG < 127, "Duplicate message format IDs");
 
 enum LogOriginType {
     ekf_origin = 0,

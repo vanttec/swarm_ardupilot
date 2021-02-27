@@ -591,3 +591,14 @@ void AP_Logger::Write_PSCZ(float pos_target_z, float pos_z, float vel_desired_z,
     };
     WriteBlock(&pkt, sizeof(pkt));
 }
+
+void AP_Logger::Write_GPSRTKPacket(uint16_t type, uint16_t length)
+{
+    struct log_GPSRTKPacket pkt {
+        LOG_PACKET_HEADER_INIT(LOG_GPS_RTK_PACKET_MSG),
+        time_us : AP_HAL::micros64(),
+        type    : type,
+        length  : length
+    };
+    WriteBlock(&pkt, sizeof(pkt));
+}
