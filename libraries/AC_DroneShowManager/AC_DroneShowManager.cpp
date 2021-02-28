@@ -163,12 +163,12 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     AP_GROUPINFO("LED0_COUNT", 7, AC_DroneShowManager, _params.led_specs[0].count, 16),
 
     // @Param: MODE_BOOT
-    // @DisplayName: Start in show mode at boot
-    // @Description: Specifies whether the drone should boot in show mode. This parameter is deprecated and superseded by INITIAL_MODE.
-    // @Range: 0 1
-    // @Increment: 1
+    // @DisplayName: Conditions for entering show mode
+    // @Description: Bitfield that Specifies when the drone should switch to show mode automatically
+    // @Values: 3:At boot and when authorized,2:When authorized,1:At boot,0:Never
+    // @Bitmask: 0:At boot,1:When authorized
     // @User: Standard
-    AP_GROUPINFO("MODE_BOOT", 9, AC_DroneShowManager, _params.boot_in_show_mode, 0),
+    AP_GROUPINFO("MODE_BOOT", 9, AC_DroneShowManager, _params.show_mode_settings, 2),
 
     // @Param: PRE_LIGHTS
     // @DisplayName: Brightness of preflight check related lights
@@ -809,7 +809,12 @@ void AC_DroneShowManager::handle_rc_start_switch()
 
 bool AC_DroneShowManager::should_switch_to_show_mode_at_boot() const
 {
-    return _params.boot_in_show_mode;
+    return _params.show_mode_settings & 1;
+}
+
+bool AC_DroneShowManager::should_switch_to_show_mode_when_authorized() const
+{
+    return _params.show_mode_settings & 2;
 }
 
 void AC_DroneShowManager::start_if_not_running()
@@ -838,8 +843,10 @@ void AC_DroneShowManager::update()
 void AC_DroneShowManager::_check_changes_in_parameters()
 {
     static int32_t last_seen_start_time_gps_sec = -1;
+    static bool last_seen_show_authorization_state = false;
     uint32_t start_time_gps_msec;
     bool new_start_time_pending = _params.start_time_gps_sec != last_seen_start_time_gps_sec;
+    bool new_show_authorization_pending = _params.authorized_to_start != last_seen_show_authorization_state;
 
     if (new_start_time_pending) {
         // We don't allow the user to mess around with the start time if we are
@@ -886,6 +893,17 @@ void AC_DroneShowManager::_check_changes_in_parameters()
             gcs().send_text(MAV_SEVERITY_INFO, "Start time cleared");
         }
         */
+    }
+
+    if (new_show_authorization_pending) {
+        last_seen_show_authorization_state = _params.authorized_to_start;
+
+        // Show authorization state changed recently. We might need to switch
+        // flight modes, but we cannot change flight modes from here so we just
+        // set a flag.
+        if (has_authorization_to_start() && should_switch_to_show_mode_when_authorized()) {
+            _request_switch_to_show_mode();
+        }
     }
 }
 

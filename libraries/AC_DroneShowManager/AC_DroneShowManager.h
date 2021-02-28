@@ -245,6 +245,9 @@ public:
     // after boot if there is no RC input
     bool should_switch_to_show_mode_at_boot() const;
 
+    // Returns whether the drone should switch to show mode when authorized to start
+    bool should_switch_to_show_mode_when_authorized() const;
+
     // Asks the drone show manager to schedule a start as soon as possible if
     // the show is not running yet
     void start_if_not_running();
@@ -292,8 +295,8 @@ private:
         // Whether the drone has been authorized to start
         AP_Int8 authorized_to_start;
 
-        // Whether the drone should boot in show mode
-        AP_Int8 boot_in_show_mode;
+        // Whether the drone should boot in show mode, and whether we should enter show mode automatically when authorized
+        AP_Int8 show_mode_settings;
 
         // Brightness of status light signals when the drone is on the ground
         AP_Int8 preflight_light_signal_brightness;
@@ -460,6 +463,9 @@ private:
     // Returns whether the GPS fix of the drone is good enough so we can trust
     // that it has accurate tiem information.
     bool _is_gps_time_ok() const;
+
+    // Requests the vehicle to switch to drone show mode.
+    virtual void _request_switch_to_show_mode() {};
 
     bool _load_show_file_from_storage();
     void _set_light_program_and_take_ownership(struct sb_light_program_s *value);

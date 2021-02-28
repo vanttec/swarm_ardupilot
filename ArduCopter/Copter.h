@@ -68,7 +68,6 @@
 #include <AC_Sprayer/AC_Sprayer.h>          // Crop sprayer library
 #include <AP_ADSB/AP_ADSB.h>                // ADS-B RF based collision avoidance module library
 #include <AP_Proximity/AP_Proximity.h>      // ArduPilot proximity sensor library
-#include <AC_DroneShowManager/AC_DroneShowManager.h>  // Drone show library
 
 // Configuration
 #include "defines.h"
@@ -170,6 +169,10 @@
 #include "avoidance_adsb.h"
 #endif
 
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+#include "mode_drone_show.h"
+#endif
+
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #include <SITL/SITL.h>
 #endif
@@ -184,6 +187,10 @@ public:
     friend class Parameters;
     friend class ParametersG2;
     friend class AP_Avoidance_Copter;
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    friend class AC_DroneShowManager_Copter;
+#endif
 
 #if ADVANCED_FAILSAFE == ENABLED
     friend class AP_AdvancedFailsafe_Copter;
