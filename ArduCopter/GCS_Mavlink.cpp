@@ -1363,6 +1363,10 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
 #endif
         
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
+    case MAVLINK_MSG_ID_DATA16:
+    case MAVLINK_MSG_ID_DATA32:
+    case MAVLINK_MSG_ID_DATA64:
+    case MAVLINK_MSG_ID_DATA96:
     case MAVLINK_MSG_ID_LED_CONTROL:
         if (!copter.g2.drone_show_manager.handle_message(msg)) {
             // also make sure to keep the original behaviour

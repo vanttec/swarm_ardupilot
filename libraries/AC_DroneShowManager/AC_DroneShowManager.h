@@ -439,6 +439,21 @@ private:
     // Flashes the LEDs of the drone with the given color
     void _flash_leds_with_color(uint8_t red, uint8_t green, uint8_t blue, uint8_t count, LightEffectPriority priority);
 
+    // Handles a generic MAVLink DATA* message from the ground station.
+    bool _handle_custom_data_message(uint8_t type, void* data, uint8_t length);
+
+    // Handles a MAVLink DATA16 message from the ground station.
+    bool _handle_data16_message(const mavlink_message_t& msg);
+
+    // Handles a MAVLink DATA32 message from the ground station.
+    bool _handle_data32_message(const mavlink_message_t& msg);
+
+    // Handles a MAVLink DATA64 message from the ground station.
+    bool _handle_data64_message(const mavlink_message_t& msg);
+
+    // Handles a MAVLink DATA96 message from the ground station.
+    bool _handle_data96_message(const mavlink_message_t& msg);
+
     // Handles a MAVLink LED_CONTROL message from the ground station.
     bool _handle_led_control_message(const mavlink_message_t& msg);
 

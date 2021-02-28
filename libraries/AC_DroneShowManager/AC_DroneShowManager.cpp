@@ -76,6 +76,15 @@ namespace Colors {
     static const sb_rgb_color_t WHITE = { 255, 255, 255 };
 };
 
+namespace CustomPackets {
+    static const uint8_t START_CONFIG = 1;
+
+    typedef struct PACKED {
+        uint32_t start_time;
+        uint8_t is_authorized;
+    } start_config_t;
+};
+
 const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Param: START_TIME
     // @DisplayName: Start time
@@ -577,6 +586,21 @@ bool AC_DroneShowManager::handle_message(const mavlink_message_t& msg)
 {
     switch (msg.msgid)
     {
+        // DATA16, DATA32, DATA64, DATA96 packets are used for custom commands.
+        // We do not distinguish between them because MAVLink2 truncates the
+        // trailing zeros anyway.
+        case MAVLINK_MSG_ID_DATA16:
+            return _handle_data16_message(msg);
+
+        case MAVLINK_MSG_ID_DATA32:
+            return _handle_data32_message(msg);
+
+        case MAVLINK_MSG_ID_DATA64:
+            return _handle_data64_message(msg);
+
+        case MAVLINK_MSG_ID_DATA96:
+            return _handle_data96_message(msg);
+
         case MAVLINK_MSG_ID_LED_CONTROL:
             // The drone show LED listens on the "secret" LED ID 42 with a
             // pattern of 42 as well. Any message that does not match this
@@ -939,6 +963,73 @@ void AC_DroneShowManager::_flash_leds_with_color(uint8_t red, uint8_t green, uin
     _light_signal.effect = LightEffect_Blinking;
     _light_signal.period_msec = 300;  /* 100ms on, 200ms off */
     _light_signal.phase_msec = 0;     /* exact sync with GPS clock */
+}
+
+bool AC_DroneShowManager::_handle_custom_data_message(uint8_t type, void* data, uint8_t length)
+{
+    if (data == nullptr) {
+        return false;
+    }
+
+    // We allocate type 0x5C for the GCS-to-drone packets (0X5B is the drone-to-GCS
+    // status packet), and sacrifice the first byte of the payload to identify
+    // the _real_ message type. This reduces the chance of clashes with other
+    // DATA* messages from third parties. The type that we receive in this
+    // function is the _real_ message type.
+    switch (type) {
+        // Broadcast start time and authorization state of the show
+        case CustomPackets::START_CONFIG:
+            if (length >= sizeof(CustomPackets::start_config_t)) {
+                CustomPackets::start_config_t* start_config = static_cast<CustomPackets::start_config_t*>(data);
+                _params.start_time_gps_sec = start_config->start_time;
+                _params.authorized_to_start = start_config->is_authorized;
+
+                return true;
+            }
+            break;
+    }
+
+    return false;
+}
+
+bool AC_DroneShowManager::_handle_data16_message(const mavlink_message_t& msg)
+{
+    mavlink_data16_t packet;
+    mavlink_msg_data16_decode(&msg, &packet);
+    if (packet.type != 0x5C || packet.len < 1) {
+        return false;
+    }
+    return _handle_custom_data_message(packet.data[0], packet.data + 1, packet.len - 1);
+}
+
+bool AC_DroneShowManager::_handle_data32_message(const mavlink_message_t& msg)
+{
+    mavlink_data32_t packet;
+    mavlink_msg_data32_decode(&msg, &packet);
+    if (packet.type != 0x5C || packet.len < 1) {
+        return false;
+    }
+    return _handle_custom_data_message(packet.data[0], packet.data + 1, packet.len - 1);
+}
+
+bool AC_DroneShowManager::_handle_data64_message(const mavlink_message_t& msg)
+{
+    mavlink_data64_t packet;
+    mavlink_msg_data64_decode(&msg, &packet);
+    if (packet.type != 0x5C || packet.len < 1) {
+        return false;
+    }
+    return _handle_custom_data_message(packet.data[0], packet.data + 1, packet.len - 1);
+}
+
+bool AC_DroneShowManager::_handle_data96_message(const mavlink_message_t& msg)
+{
+    mavlink_data96_t packet;
+    mavlink_msg_data96_decode(&msg, &packet);
+    if (packet.type != 0x5C || packet.len < 1) {
+        return false;
+    }
+    return _handle_custom_data_message(packet.data[0], packet.data + 1, packet.len - 1);
 }
 
 bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& msg)
