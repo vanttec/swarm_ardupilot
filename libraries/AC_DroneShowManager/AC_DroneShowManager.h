@@ -198,6 +198,11 @@ public:
         return _takeoff_time_sec >= 0 && _landing_time_sec > _takeoff_time_sec;
     }
 
+    // Returns whether the drone is in the group with the given index
+    bool is_in_group(uint8_t index) const {
+        return _params.group_index == index;
+    }
+
     // Returns whether the velocity control mode is enabled
     bool is_velocity_control_enabled() const {
         return _params.control_mode_flags & DroneShowControl_VelocityControlEnabled;
@@ -206,6 +211,11 @@ public:
     // Returns whether a show file was identified and loaded at boot time
     bool loaded_show_data_successfully() const;
 
+    // Returns whether the drone matches the given group mask
+    bool matches_group_mask(uint8_t mask) const {
+        return mask == 0 || mask & (1 << _params.group_index);
+    }
+    
     // Notifies the drone show manager that the drone show mode was initialized
     void notify_drone_show_mode_initialized();
 
@@ -290,6 +300,9 @@ private:
 
         // Bitmask to set up various aspects of the control algorithm
         AP_Int16 control_mode_flags;
+
+        // Index of the group that this drone belongs to. Currently we support at most 8 groups, indexed from 0 to 7.
+        AP_Int8 group_index;
 
         struct {
             // Specifies where the a given LED light channel of the show should be sent

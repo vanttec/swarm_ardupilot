@@ -44,6 +44,9 @@
 // Largest valid value of show AMSL. Values smaller than this are considered invalid.
 #define LARGEST_VALID_AMSL 10000000
 
+// Group mask indicating all groups
+#define ALL_GROUPS 0
+
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 // UDP port that the drone show manager uses to broadcast the status of the RGB light
 // when compiled with the SITL simulator. Uncomment if you need it.
@@ -173,6 +176,14 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Bitmask: 0:VelCtrl
     // @User: Advanced
     AP_GROUPINFO("CTRL_MODE", 11, AC_DroneShowManager, _params.control_mode_flags, DroneShowControl_VelocityControlEnabled),
+
+    // @Param: GROUP
+    // @DisplayName: Group index
+    // @Description: Index of the group that this drone belongs to
+    // @Range: 0 7
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("GROUP", 13, AC_DroneShowManager, _params.group_index, 0),
 
     AP_GROUPEND
 };
@@ -934,6 +945,7 @@ bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& m
 {
     mavlink_led_control_t packet;
     LightEffectPriority priority;
+    uint8_t mask = ALL_GROUPS;
 
     mavlink_msg_led_control_decode(&msg, &packet);
 
@@ -942,49 +954,75 @@ bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& m
         return false;
     }
 
-    if (packet.custom_len == 0 || packet.custom_len == 3 || packet.custom_len == 5 || packet.custom_len == 6) {
-        // Individual messages take precedence over broadcast messages so we need to
-        // know whether this message is broadcast
-        priority = (packet.target_system == 0)
-            ? LightEffectPriority_Broadcast
-            : LightEffectPriority_Individual;
-        if (priority < _light_signal.priority) {
-            // Previous light signal has a higher priority, but maybe it ended already?
-            if (_light_signal.started_at_msec + _light_signal.duration_msec < AP_HAL::millis()) {
-                _light_signal.priority = LightEffectPriority_None;
-            } else {
-                // Handled but ignored by us because a higher priority effect is still
-                // playing.
-                return true;
-            }
+    // LED control packets exist in five variants:
+    //
+    // custom_len == 0 --> simple blink request
+    // custom_len == 1 --> simple blink request, but only if the drone matches
+    //                     the group mask given in the last byte
+    // custom_len == 3 --> set the LED to a specific color for five seconds
+    // custom_len == 5 --> set the LED to a specific color for a given duration (msec)
+    // custom_len == 6 --> set the LED to a specific color for a given duration (msec),
+    //                     modulated by a given effect
+    // custom_len == 7 --> set the LED to a specific color for a given duration (msec),
+    //                     modulated by a given effect, but only if the drone matches
+    //                     the group mask given in the last byte
+
+    if (packet.custom_len >= 8 || packet.custom_len == 2 || packet.custom_len == 4) {
+        // Not handled by us
+        return false;
+    }
+    
+    // Individual messages take precedence over broadcast messages so we need to
+    // know whether this message is broadcast
+    priority = (packet.target_system == 0)
+        ? LightEffectPriority_Broadcast
+        : LightEffectPriority_Individual;
+    if (priority < _light_signal.priority) {
+        // Previous light signal has a higher priority, but maybe it ended already?
+        if (_light_signal.started_at_msec + _light_signal.duration_msec < AP_HAL::millis()) {
+            _light_signal.priority = LightEffectPriority_None;
+        } else {
+            // Handled but ignored by us because a higher priority effect is still
+            // playing.
+            return true;
         }
+    }
 
-        _light_signal.started_at_msec = AP_HAL::millis();
-        _light_signal.priority = priority;
+    _light_signal.started_at_msec = AP_HAL::millis();
+    _light_signal.priority = priority;
 
-        if (packet.custom_len == 0) {
-            // Start blinking the drone show LED
+    if (packet.custom_len < 2) {
+        // Start blinking the drone show LED
+        if (packet.custom_len == 1) {
+            mask = packet.custom_bytes[0];
+        }
+        if (matches_group_mask(mask)) {
             _flash_leds_with_color(255, 255, 255, /* count = */ 5, priority);
-        } else if (packet.custom_len == 3) {
-            // Set the drone show LED to a specific color for five seconds
-            _light_signal.duration_msec = 5000;
-            _light_signal.color[0] = packet.custom_bytes[0];
-            _light_signal.color[1] = packet.custom_bytes[1];
-            _light_signal.color[2] = packet.custom_bytes[2];
-            _light_signal.effect = LightEffect_Solid;
-            _light_signal.period_msec = 0;    /* doesn't matter */
-            _light_signal.phase_msec = 0;     /* doesn't matter */
-        } else if (packet.custom_len == 5) {
-            // Set the drone show LED to a specific color for a given number of
-            // milliseconds
-            _light_signal.duration_msec = packet.custom_bytes[3] + (packet.custom_bytes[4] << 8);
-            _light_signal.color[0] = packet.custom_bytes[0];
-            _light_signal.color[1] = packet.custom_bytes[1];
-            _light_signal.color[2] = packet.custom_bytes[2];
-            _light_signal.effect = LightEffect_Solid;
-            _light_signal.period_msec = 0;    /* doesn't matter */
-            _light_signal.phase_msec = 0;     /* doesn't matter */
-        } else if (packet.custom_len == 6) {
+        }
+    } else if (packet.custom_len == 3) {
+        // Set the drone show LED to a specific color for five seconds
+        _light_signal.duration_msec = 5000;
+        _light_signal.color[0] = packet.custom_bytes[0];
+        _light_signal.color[1] = packet.custom_bytes[1];
+        _light_signal.color[2] = packet.custom_bytes[2];
+        _light_signal.effect = LightEffect_Solid;
+        _light_signal.period_msec = 0;    /* doesn't matter */
+        _light_signal.phase_msec = 0;     /* doesn't matter */
+    } else if (packet.custom_len == 5) {
+        // Set the drone show LED to a specific color for a given number of
+        // milliseconds
+        _light_signal.duration_msec = packet.custom_bytes[3] + (packet.custom_bytes[4] << 8);
+        _light_signal.color[0] = packet.custom_bytes[0];
+        _light_signal.color[1] = packet.custom_bytes[1];
+        _light_signal.color[2] = packet.custom_bytes[2];
+        _light_signal.effect = LightEffect_Solid;
+        _light_signal.period_msec = 0;    /* doesn't matter */
+        _light_signal.phase_msec = 0;     /* doesn't matter */
+    } else if (packet.custom_len == 6 || packet.custom_len == 7) {
+        if (packet.custom_len == 7) {
+            mask = packet.custom_bytes[6];
+        }
+        if (matches_group_mask(mask)) {
             // Set the drone show LED to a specific color for a given number of
             // milliseconds, modulated by a given effect
             _light_signal.duration_msec = packet.custom_bytes[3] + (packet.custom_bytes[4] << 8);
@@ -1013,16 +1051,13 @@ bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& m
                 _light_signal.phase_msec = is_effect_synced_to_gps ? 0 : get_random16() % _light_signal.period_msec;
             }
         }
+    }
 
-        // Handle zero duration; it means that we need to turn off whatever
-        // effect we have now.
-        if (_light_signal.duration_msec == 0) {
-            _light_signal.started_at_msec = 0;
-            _light_signal.effect = LightEffect_Off;
-        }
-    } else {
-        // Not handled by us
-        return false;
+    // Handle zero duration; it means that we need to turn off whatever
+    // effect we have now.
+    if (matches_group_mask(mask) && _light_signal.duration_msec == 0) {
+        _light_signal.started_at_msec = 0;
+        _light_signal.effect = LightEffect_Off;
     }
 
     return true;
