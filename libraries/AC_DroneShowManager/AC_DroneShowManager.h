@@ -108,6 +108,10 @@ public:
     // program the given number of seconds after the start time.
     void get_color_of_rgb_light_at_seconds(float time, sb_rgb_color_t* color);
 
+    // Returns the preferred duration between consecutive guided mode commands
+    // during the execution of the show.
+    uint32_t get_controller_update_delta_msec() const { return _controller_update_delta_msec; }
+
     // Returns the desired position of the drone during the drone show the
     // given number of seconds after the start time, in the global coordinate
     // system, using centimeters as units.
@@ -304,6 +308,9 @@ private:
         // Bitmask to set up various aspects of the control algorithm
         AP_Int16 control_mode_flags;
 
+        // Specifies how many times we send a new guided mode command during the show, per second.
+        AP_Int8 control_rate_hz;
+        
         // Index of the group that this drone belongs to. Currently we support at most 8 groups, indexed from 0 to 7.
         AP_Int8 group_index;
 
@@ -394,6 +401,11 @@ private:
     // to cancel the show as soon as possible. This is checked regularly by
     // mode_drone_show.cpp
     bool _cancel_requested;
+
+    // The preferred duration between consecutive guided mode commands
+    // during the execution of the show. Updated soon after the corresponding
+    // parameter changes.
+    uint32_t _controller_update_delta_msec;
 
     // Factory object that can create RGBLed instances that the drone show manager will control
     DroneShowLEDFactory* _rgb_led_factory;

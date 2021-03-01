@@ -548,8 +548,9 @@ void ModeDroneShow::performing_run()
     static uint32_t last_guided_command = 0;
     bool exited_mode = 0;
     uint32_t now = AP_HAL::millis();
+    uint32_t target_dt = copter.g2.drone_show_manager.get_controller_update_delta_msec();
 
-    if (now - last_guided_command >= 250) {
+    if (now - last_guided_command >= target_dt) {
         if (!send_guided_mode_command_during_performance()) {
             // Failed to send guided mode command; try to switch to position
             // hold instead. This should not happen anyway.

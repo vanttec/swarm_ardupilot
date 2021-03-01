@@ -38,6 +38,9 @@
 
 #define SHOW_FILE (HAL_BOARD_COLLMOT_DIRECTORY "/show.skyb")
 
+// Default update rate for position and velocity targets
+#define DEFAULT_UPDATE_RATE_HZ 10
+
 // Smallest valid value of show AMSL. Values smaller than this are considered unset.
 #define SMALLEST_VALID_AMSL -9999999
 
@@ -194,6 +197,14 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("GROUP", 13, AC_DroneShowManager, _params.group_index, 0),
 
+    // @Param: CTRL_RATE
+    // @DisplayName: Target update rate
+    // @Description: Update rate of the target position and velocity during the show
+    // @Range: 1 50
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("CTRL_RATE", 14, AC_DroneShowManager, _params.control_rate_hz, DEFAULT_UPDATE_RATE_HZ),
+
     AP_GROUPEND
 };
 
@@ -220,6 +231,7 @@ AC_DroneShowManager::AC_DroneShowManager() :
     _landing_time_sec(0),
     _total_duration_sec(0),
     _cancel_requested(false),
+    _controller_update_delta_msec(1000 / DEFAULT_UPDATE_RATE_HZ),
     _rgb_led(0),
     _rc_start_switch_blocked_until(0),
     _boot_count(0)
@@ -844,7 +856,10 @@ void AC_DroneShowManager::_check_changes_in_parameters()
 {
     static int32_t last_seen_start_time_gps_sec = -1;
     static bool last_seen_show_authorization_state = false;
+    static int16_t last_seen_control_rate_hz = DEFAULT_UPDATE_RATE_HZ;
     uint32_t start_time_gps_msec;
+
+    bool new_control_rate_pending = _params.control_rate_hz != last_seen_control_rate_hz;    
     bool new_start_time_pending = _params.start_time_gps_sec != last_seen_start_time_gps_sec;
     bool new_show_authorization_pending = _params.authorized_to_start != last_seen_show_authorization_state;
 
@@ -903,6 +918,20 @@ void AC_DroneShowManager::_check_changes_in_parameters()
         // set a flag.
         if (has_authorization_to_start() && should_switch_to_show_mode_when_authorized()) {
             _request_switch_to_show_mode();
+        }
+    }
+
+    if (new_control_rate_pending) {
+        last_seen_control_rate_hz = _params.control_rate_hz;
+
+        // Validate the control rate from the parameters and convert it to
+        // milliseconds
+        if (last_seen_control_rate_hz < 1) {
+            _controller_update_delta_msec = 1000;
+        } else if (last_seen_control_rate_hz > 50) {
+            _controller_update_delta_msec = 20;
+        } else {
+            _controller_update_delta_msec = 1000 / last_seen_control_rate_hz;
         }
     }
 }
