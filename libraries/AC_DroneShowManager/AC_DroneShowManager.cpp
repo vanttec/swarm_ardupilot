@@ -88,8 +88,9 @@ namespace CustomPackets {
     typedef struct PACKED {
         // Start time to set on the drone, in GPS time of week (sec). Anything
         // larger than 604799 means not to touch the start time that is
-        // currently set. 
-        uint32_t start_time;
+        // currently set. Negative number means that the start time must be
+        // cleared.
+        int32_t start_time;
         uint8_t is_authorized;
     } start_config_t;
 };
@@ -1034,7 +1035,9 @@ bool AC_DroneShowManager::_handle_custom_data_message(uint8_t type, void* data, 
         case CustomPackets::START_CONFIG:
             if (length >= sizeof(CustomPackets::start_config_t)) {
                 CustomPackets::start_config_t* start_config = static_cast<CustomPackets::start_config_t*>(data);
-                if (start_config->start_time < GPS_WEEK_LENGTH_SEC) {
+                if (start_config->start_time < 0) {
+                    _params.start_time_gps_sec = -1;
+                } else if (start_config->start_time < GPS_WEEK_LENGTH_SEC) {
                     _params.start_time_gps_sec = start_config->start_time;
                 }
                 _params.authorized_to_start = start_config->is_authorized;
