@@ -41,6 +41,9 @@
 // Default update rate for position and velocity targets
 #define DEFAULT_UPDATE_RATE_HZ 10
 
+// Length of a GPS week in seconds
+#define GPS_WEEK_LENGTH_SEC 604800
+
 // Smallest valid value of show AMSL. Values smaller than this are considered unset.
 #define SMALLEST_VALID_AMSL -9999999
 
@@ -83,6 +86,9 @@ namespace CustomPackets {
     static const uint8_t START_CONFIG = 1;
 
     typedef struct PACKED {
+        // Start time to set on the drone, in GPS time of week (sec). Anything
+        // larger than 604799 means not to touch the start time that is
+        // currently set. 
         uint32_t start_time;
         uint8_t is_authorized;
     } start_config_t;
@@ -834,7 +840,7 @@ void AC_DroneShowManager::start_if_not_running()
     _cancel_requested = false;
 
     if (_is_gps_time_ok()) {
-        _params.start_time_gps_sec = (AP::gps().time_week_ms() / 1000 + 10) % 604800;
+        _params.start_time_gps_sec = (AP::gps().time_week_ms() / 1000 + 10) % GPS_WEEK_LENGTH_SEC;
         _start_time_source = StartTimeSource::START_METHOD;
     }
 }
@@ -1028,7 +1034,9 @@ bool AC_DroneShowManager::_handle_custom_data_message(uint8_t type, void* data, 
         case CustomPackets::START_CONFIG:
             if (length >= sizeof(CustomPackets::start_config_t)) {
                 CustomPackets::start_config_t* start_config = static_cast<CustomPackets::start_config_t*>(data);
-                _params.start_time_gps_sec = start_config->start_time;
+                if (start_config->start_time < GPS_WEEK_LENGTH_SEC) {
+                    _params.start_time_gps_sec = start_config->start_time;
+                }
                 _params.authorized_to_start = start_config->is_authorized;
 
                 return true;
