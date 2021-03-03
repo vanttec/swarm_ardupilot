@@ -102,7 +102,7 @@ public:
     // SMALLEST_VALID_AMSL, i.e. less than or equal to
     bool configure_show_coordinate_system(
         int32_t lat, int32_t lon, int32_t amsl_mm, float orientation_deg
-    );
+    ) WARN_IF_UNUSED;
 
     // Returns the color of the LED light on the drone according to its light
     // program the given number of seconds after the start time.
@@ -115,7 +115,7 @@ public:
     // Returns the desired position of the drone during the drone show the
     // given number of seconds after the start time, in the global coordinate
     // system, using centimeters as units.
-    void get_desired_global_position_in_cms_at_seconds(float time, Location& loc);
+    void get_desired_global_position_at_seconds(float time, Location& loc);
 
     // Returns the desired velocity of the drone during the drone show the
     // given number of seconds after the start time, in the global NEU
@@ -173,7 +173,7 @@ public:
     MAV_RESULT handle_command_long_packet(const mavlink_command_long_t &packet);
 
     // Handles a MAVLink message forwarded to the drone show manager by the central MAVLink handler
-    bool handle_message(const mavlink_message_t& msg);
+    bool handle_message(const mavlink_message_t& msg) WARN_IF_UNUSED;
 
     // Asks the drone show manager to schedule a start as soon as possible if
     // the show is not running yet, assuming that the signal was sent from the
@@ -234,13 +234,13 @@ public:
 
     // Notifies the drone show manager that the takeoff is about to take place.
     // The drone show manager may decide to cancel the takeoff by returning false.
-    bool notify_takeoff_attempt();
+    bool notify_takeoff_attempt() WARN_IF_UNUSED;
 
     // Handler for the MAVLink CMD_USER1 message that allows the user to reload _or_ clear the show
-    bool reload_or_clear_show(bool do_clear);
+    bool reload_or_clear_show(bool do_clear) WARN_IF_UNUSED;
 
     // Asks the drone show manager to reload the show file from the storage
-    bool reload_show_from_storage();
+    bool reload_show_from_storage() WARN_IF_UNUSED;
 
     // Sends a drone show status message (wrapped in a DATA16 packet) on the given MAVLink channel
     void send_drone_show_status(const mavlink_channel_t chan) const;
