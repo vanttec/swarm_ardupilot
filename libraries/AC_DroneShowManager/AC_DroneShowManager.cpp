@@ -9,6 +9,7 @@
 #include <AP_Filesystem/AP_Filesystem.h>
 #include <AP_GPS/AP_GPS.h>
 #include <AP_HAL/AP_HAL.h>
+#include <AP_Logger/AP_Logger.h>
 #include <AP_Math/AP_Math.h>
 #include <AP_Motors/AP_Motors.h>
 #include <AP_Notify/AP_Notify.h>
@@ -335,6 +336,15 @@ bool AC_DroneShowManager::configure_show_coordinate_system(
     _params.origin_lng.set_and_save(lng);
     _params.origin_amsl.set_and_save(amsl_mm);
     _params.orientation_deg.set_and_save(orientation_deg);
+
+    // Log the new values
+    AP_Logger *logger = AP_Logger::get_singleton();
+    if (logger != nullptr) {
+        logger->Write_Parameter("SHOW_ORIGIN_LAT", static_cast<float>(lat));
+        logger->Write_Parameter("SHOW_ORIGIN_LNG", static_cast<float>(lng));
+        logger->Write_Parameter("SHOW_ORIGIN_AMSL", static_cast<float>(amsl_mm));
+        logger->Write_Parameter("SHOW_ORIENTATION", static_cast<float>(orientation_deg));
+    }
 
     return true;
 }
