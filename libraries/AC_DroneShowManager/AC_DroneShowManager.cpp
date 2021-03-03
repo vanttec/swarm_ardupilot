@@ -328,10 +328,13 @@ bool AC_DroneShowManager::configure_show_coordinate_system(
         return false;
     }
 
-    _params.origin_lat = lat;
-    _params.origin_lng = lng;
-    _params.origin_amsl = amsl_mm;
-    _params.orientation_deg = orientation_deg;
+    // We need to set the new values _and_ save them to the EEPROM. The save
+    // operation is asynchronous; it might not go through immediately, but it
+    // should go through in a few milliseconds.
+    _params.origin_lat.set_and_save(lat);
+    _params.origin_lng.set_and_save(lng);
+    _params.origin_amsl.set_and_save(amsl_mm);
+    _params.orientation_deg.set_and_save(orientation_deg);
 
     return true;
 }
@@ -341,7 +344,7 @@ void AC_DroneShowManager::get_color_of_rgb_light_at_seconds(float time, sb_rgb_c
     *color = sb_light_player_get_color_at(_light_player, time < 0 || time > 86400000 ? 0 : time * 1000);
 }
 
-void AC_DroneShowManager::get_desired_global_position_in_cms_at_seconds(float time, Location& loc)
+void AC_DroneShowManager::get_desired_global_position_at_seconds(float time, Location& loc)
 {
     sb_vector3_with_yaw_t vec;
     float offset_north, offset_east;
@@ -355,7 +358,7 @@ void AC_DroneShowManager::get_desired_global_position_in_cms_at_seconds(float ti
     offset_east = sinf(_orientation_rad) * vec.x - cosf(_orientation_rad) * vec.y;
 
     // We have millimeters so far, need to convert the North and East offsets
-    // to meters first. ALso, in the Z axis, we will need centimeters.
+    // to meters first. Also, in the Z axis, we will need centimeters.
     offset_north = offset_north / 1000.0f;
     offset_east = offset_east / 1000.0f;
     vec.z = vec.z / 10.0f;
@@ -841,6 +844,9 @@ void AC_DroneShowManager::start_if_not_running()
     _cancel_requested = false;
 
     if (_is_gps_time_ok()) {
+        // We are modifying a parameter directly here without notifying the
+        // param subsystem, but this is okay -- we do not want to save the
+        // start time into the EEPROM, and it is reset at the next boot anyway.
         _params.start_time_gps_sec = (AP::gps().time_week_ms() / 1000 + 10) % GPS_WEEK_LENGTH_SEC;
         _start_time_source = StartTimeSource::START_METHOD;
     }

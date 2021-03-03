@@ -777,7 +777,7 @@ bool ModeDroneShow::send_guided_mode_command_during_performance()
 
     float elapsed = copter.g2.drone_show_manager.get_elapsed_time_since_start_sec();
 
-    copter.g2.drone_show_manager.get_desired_global_position_in_cms_at_seconds(elapsed, loc);
+    copter.g2.drone_show_manager.get_desired_global_position_at_seconds(elapsed, loc);
     copter.g2.drone_show_manager.get_desired_velocity_neu_in_cms_per_seconds_at_seconds(elapsed, vel);
 
     if (loc.get_vector_from_origin_NEU(pos))
