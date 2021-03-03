@@ -349,6 +349,9 @@ bool Copter::should_disarm_on_failsafe() {
         case Mode::Number::AUTO:
             // if mission has not started AND vehicle is landed, disarm motors
             return !ap.auto_armed && ap.land_complete;
+        case Mode::Number::DRONE_SHOW:
+            // if show has not started AND vehicle is landed, disarm motors
+            return !ap.auto_armed && ap.land_complete;
         default:
             // used for AltHold, Guided, Loiter, RTL, Circle, Drift, Sport, Flip, Autotune, PosHold
             // if landed disarm
