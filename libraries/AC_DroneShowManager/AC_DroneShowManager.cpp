@@ -406,18 +406,19 @@ void AC_DroneShowManager::get_desired_global_position_at_seconds(float time, Loc
 void AC_DroneShowManager::get_desired_velocity_neu_in_cms_per_seconds_at_seconds(float time, Vector3f& vel)
 {
     sb_vector3_with_yaw_t vec;
+    float vel_north, vel_east;
 
     sb_trajectory_player_get_velocity_at(_trajectory_player, time, &vec);
 
     // We need to rotate the X axis by -_orientation_rad degrees so it
     // points North. At the same time, we also flip the Y axis so it points
     // East and not West.
-    vec.x = cosf(_orientation_rad) * vec.x + sinf(_orientation_rad) * vec.y;
-    vec.y = sinf(_orientation_rad) * vec.x - cosf(_orientation_rad) * vec.y;
+    vel_north = cosf(_orientation_rad) * vec.x + sinf(_orientation_rad) * vec.y;
+    vel_east = sinf(_orientation_rad) * vec.x - cosf(_orientation_rad) * vec.y;
 
     // We have mm/s so far, need to convert to cm/s
-    vel.x = vec.x / 10.0f;
-    vel.y = vec.y / 10.0f;
+    vel.x = vel_north / 10.0f;
+    vel.y = vel_east / 10.0f;
     vel.z = vec.z / 10.0f;
 
     // TODO(ntamas): handle yaw!
