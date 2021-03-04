@@ -357,71 +357,28 @@ void AC_DroneShowManager::get_color_of_rgb_light_at_seconds(float time, sb_rgb_c
 void AC_DroneShowManager::get_desired_global_position_at_seconds(float time, Location& loc)
 {
     sb_vector3_with_yaw_t vec;
-    float offset_north, offset_east;
-
     sb_trajectory_player_get_position_at(_trajectory_player, time, &vec);
-
-    // We need to rotate the X axis by -_orientation_rad radians so it points
-    // North. At the same time, we also flip the Y axis so it pointsEast and
-    // not West.
-    offset_north = cosf(_orientation_rad) * vec.x + sinf(_orientation_rad) * vec.y;
-    offset_east = sinf(_orientation_rad) * vec.x - cosf(_orientation_rad) * vec.y;
-
-    // We have millimeters so far, need to convert the North and East offsets
-    // to meters first. Also, in the Z axis, we will need centimeters.
-    offset_north = offset_north / 1000.0f;
-    offset_east = offset_east / 1000.0f;
-    vec.z = vec.z / 10.0f;
-
-    // Finally, we need to offset the show origin with the calculated North and
-    // East offset to get a global position
-
-    // TODO(ntamas): handle yaw!
-
-    loc.zero();
-    loc.lat = _origin_lat;
-    loc.lng = _origin_lng;
-
-    if (_origin_amsl_is_valid) {
-        // Show is controlled in AMSL
-        loc.set_alt_cm(
-            static_cast<int32_t>(vec.z) /* [cm] */ +
-            _origin_amsl / 10.0 /* [mm] -> [cm] */,
-            Location::AltFrame::ABSOLUTE
-        );
-    } else {
-        // Show is controlled in AGL. We use altitude above home because the
-        // EKF origin could be anywhere -- it is typically established early
-        // during the initialization process, while the home is set to the
-        // point where the drone is armed.
-        loc.set_alt_cm(
-            static_cast<int32_t>(vec.z) /* [cm] */,
-            Location::AltFrame::ABOVE_HOME
-        );
-    }
-
-    loc.offset(offset_north, offset_east);
+    _show_coordinate_system.convert_show_to_global_coordinate(vec, loc);
 }
 
 void AC_DroneShowManager::get_desired_velocity_neu_in_cms_per_seconds_at_seconds(float time, Vector3f& vel)
 {
     sb_vector3_with_yaw_t vec;
     float vel_north, vel_east;
+    float orientation_rad = _show_coordinate_system.orientation_rad;
 
     sb_trajectory_player_get_velocity_at(_trajectory_player, time, &vec);
 
     // We need to rotate the X axis by -_orientation_rad degrees so it
     // points North. At the same time, we also flip the Y axis so it points
     // East and not West.
-    vel_north = cosf(_orientation_rad) * vec.x + sinf(_orientation_rad) * vec.y;
-    vel_east = sinf(_orientation_rad) * vec.x - cosf(_orientation_rad) * vec.y;
+    vel_north = cosf(orientation_rad) * vec.x + sinf(orientation_rad) * vec.y;
+    vel_east = sinf(orientation_rad) * vec.x - cosf(orientation_rad) * vec.y;
 
     // We have mm/s so far, need to convert to cm/s
     vel.x = vel_north / 10.0f;
     vel.y = vel_east / 10.0f;
     vel.z = vec.z / 10.0f;
-
-    // TODO(ntamas): handle yaw!
 }
 
 // returns the elapsed time since the start of the show, in microseconds
@@ -479,6 +436,23 @@ float AC_DroneShowManager::get_elapsed_time_since_start_sec() const
     // when compiling in release mode, hence we use a large negative number
     // representing one day
     return elapsed_usec == INT64_MIN ? -86400 : static_cast<float>(elapsed_usec / 1000) / 1000.0f;
+}
+
+bool AC_DroneShowManager::get_global_takeoff_position(Location& loc) const
+{
+    // This function may be called any time, not only during the show, so we
+    // need to take the parameters provided by the user, convert them into a
+    // ShowCoordinateSystem object, and then use that to get the GPS coordinates
+    sb_vector3_with_yaw_t vec;
+    ShowCoordinateSystem coordinate_system;
+
+    if (!_copy_show_coordinate_system_from_parameters_to(coordinate_system))
+    {
+        return false;
+    }
+
+    coordinate_system.convert_show_to_global_coordinate(vec, loc);
+    return true;
 }
 
 int64_t AC_DroneShowManager::get_time_until_start_usec() const
@@ -703,25 +677,7 @@ void AC_DroneShowManager::notify_landed()
 
 bool AC_DroneShowManager::notify_takeoff_attempt()
 {
-    if (!has_explicit_show_origin_set_by_user() || !has_explicit_show_orientation_set_by_user()) {
-        return false;
-    }
-        
-    _orientation_rad = radians(_params.orientation_deg);
-    _origin_lat = static_cast<int32_t>(_params.origin_lat);
-    _origin_lng = static_cast<int32_t>(_params.origin_lng);
-
-    if (has_explicit_show_altitude_set_by_user()) {
-        _origin_amsl = _params.origin_amsl;
-        if (_origin_amsl >= LARGEST_VALID_AMSL) {
-            _origin_amsl = LARGEST_VALID_AMSL;
-        }
-        _origin_amsl_is_valid = true;
-    } else {
-        _origin_amsl_is_valid = false;
-    }
-
-    return true;
+    return _copy_show_coordinate_system_from_parameters_to(_show_coordinate_system);
 }
 
 bool AC_DroneShowManager::reload_or_clear_show(bool do_clear)
@@ -995,6 +951,32 @@ void AC_DroneShowManager::_clear_start_time_if_set_by_switch()
         _start_time_source = StartTimeSource::NONE;
         _start_time_usec = 0;
     }
+}
+
+bool AC_DroneShowManager::_copy_show_coordinate_system_from_parameters_to(
+    ShowCoordinateSystem& _coordinate_system
+) const {
+    if (!has_explicit_show_origin_set_by_user() || !has_explicit_show_orientation_set_by_user()) {
+        _coordinate_system.clear();
+        return false;
+    }
+        
+    _coordinate_system.orientation_rad = radians(_params.orientation_deg);
+    _coordinate_system.origin_lat = static_cast<int32_t>(_params.origin_lat);
+    _coordinate_system.origin_lng = static_cast<int32_t>(_params.origin_lng);
+
+    if (has_explicit_show_altitude_set_by_user()) {
+        _coordinate_system.origin_amsl_mm = _params.origin_amsl;
+        if (_coordinate_system.origin_amsl_mm >= LARGEST_VALID_AMSL) {
+            _coordinate_system.origin_amsl_mm = LARGEST_VALID_AMSL;
+        }
+        _coordinate_system.origin_amsl_valid = true;
+    } else {
+        _coordinate_system.origin_amsl_mm = 0;
+        _coordinate_system.origin_amsl_valid = false;
+    }
+
+    return true;
 }
 
 uint32_t AC_DroneShowManager::_get_gps_synced_timestamp_in_millis_for_lights() const
@@ -1408,6 +1390,8 @@ void AC_DroneShowManager::_set_show_data_and_take_ownership(uint8_t *value)
 
 void AC_DroneShowManager::_set_trajectory_and_take_ownership(sb_trajectory_t *value)
 {
+    sb_vector3_with_yaw_t vec;
+
     sb_trajectory_player_destroy(_trajectory_player);
     sb_trajectory_destroy(_trajectory);
 
@@ -1423,6 +1407,17 @@ void AC_DroneShowManager::_set_trajectory_and_take_ownership(sb_trajectory_t *va
     }
 
     sb_trajectory_player_init(_trajectory_player, _trajectory);
+
+    if (sb_trajectory_player_get_position_at(_trajectory_player, 0, &vec) != SB_SUCCESS)
+    {
+        // Error while retrieving the first position
+        _trajectory_valid = false;
+        vec.x = vec.y = vec.z = 0;
+    }
+
+    _takeoff_position_mm.x = vec.x;
+    _takeoff_position_mm.y = vec.y;
+    _takeoff_position_mm.z = vec.z;
 
     _total_duration_sec = sb_trajectory_get_total_duration_sec(_trajectory);
 
@@ -1755,6 +1750,58 @@ bool AC_DroneShowManager::_open_rgb_led_socket()
 }
 
 #endif
+
+void AC_DroneShowManager::ShowCoordinateSystem::clear()
+{
+    origin_lat = origin_lng = origin_amsl_mm = 0;
+    orientation_rad = 0;
+    origin_amsl_valid = false;
+}
+
+void AC_DroneShowManager::ShowCoordinateSystem::convert_show_to_global_coordinate(
+    sb_vector3_with_yaw_t vec, Location& loc
+) {
+    float offset_north, offset_east, altitude;
+    
+    // We need to rotate the X axis by -orientation_rad radians so it points
+    // North. At the same time, we also flip the Y axis so it points East and
+    // not West.
+    offset_north = cosf(orientation_rad) * vec.x + sinf(orientation_rad) * vec.y;
+    offset_east = sinf(orientation_rad) * vec.x - cosf(orientation_rad) * vec.y;
+
+    // We have millimeters so far, need to convert the North and East offsets
+    // to meters in the XY plane first. In the Z axis, we will need centimeters.
+    offset_north = offset_north / 1000.0f;
+    offset_east = offset_east / 1000.0f;
+    altitude = vec.z / 10.0f;
+
+    // Finally, we need to offset the show origin with the calculated North and
+    // East offset to get a global position
+
+    loc.zero();
+    loc.lat = origin_lat;
+    loc.lng = origin_lng;
+
+    if (origin_amsl_valid) {
+        // Show is controlled in AMSL
+        loc.set_alt_cm(
+            static_cast<int32_t>(altitude) /* [cm] */ +
+            origin_amsl_mm / 10.0 /* [mm] -> [cm] */,
+            Location::AltFrame::ABSOLUTE
+        );
+    } else {
+        // Show is controlled in AGL. We use altitude above home because the
+        // EKF origin could be anywhere -- it is typically established early
+        // during the initialization process, while the home is set to the
+        // point where the drone is armed.
+        loc.set_alt_cm(
+            static_cast<int32_t>(altitude) /* [cm] */,
+            Location::AltFrame::ABOVE_HOME
+        );
+    }
+
+    loc.offset(offset_north, offset_east);
+}
 
 static float get_modulation_factor_for_light_effect(
     uint32_t timestamp, LightEffectType effect, uint16_t period_msec, uint16_t phase_msec

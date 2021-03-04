@@ -65,6 +65,36 @@ enum LightEffectPriority {
 /// @class  AC_DroneShowManager
 /// @brief  Class managing the trajectory and light program of a drone show
 class AC_DroneShowManager {
+
+private:
+    class ShowCoordinateSystem {
+    public:
+        // Latitude of the origin of the show coordinate system, in 1e-7 degrees
+        int32_t origin_lat;
+
+        // Longitude of the origin of the show coordinate system, in 1e-7 degrees
+        int32_t origin_lng;
+
+        // Altitude of the origin of the show coordinate system above mean sea level, in millimeters.
+        // Valid if and only if _origin_amsL_is_valid is set to true.
+        int32_t origin_amsl_mm;
+
+        // Orientation of the X axis of the show coordinate system, in radians
+        float orientation_rad;
+
+        // Stores whether the altitude above mean sea level is valid. When it is true,
+        // the show is controlled in AMSL. When it is false, the show is controlled
+        // in AGL.
+        bool origin_amsl_valid;
+
+        // Clears the show coordinate system, resetting the origin back to Null Island
+        void clear();
+
+        // Converts a coordinate given in the show coordinate system, in millimeters, to
+        // the global GPS coordinate system
+        void convert_show_to_global_coordinate(sb_vector3_with_yaw_t vec, Location& loc);
+    };
+
 public:
     AC_DroneShowManager();
     ~AC_DroneShowManager();
@@ -122,6 +152,11 @@ public:
     // cooordinate system, using centimeters as units.
     void get_desired_velocity_neu_in_cms_per_seconds_at_seconds(float time, Vector3f& vel);
 
+    // Retrieves the position where the drone is supposed to be at the start of the show.
+    // Returns true if successful or false if the show coordinate system was not set up
+    // by the user yet.
+    bool get_global_takeoff_position(Location& loc) const;
+    
     // Returns the last color that was emitted to the RGB light
     void get_last_rgb_led_color(sb_rgb_color_t& color) const { color = _last_rgb_led_color; }
 
@@ -345,25 +380,9 @@ private:
     struct sb_light_player_s* _light_player;
     bool _light_program_valid;
 
-    // Latitude of drone show coordinate system, in 1e-7 degrees
-    int32_t _origin_lat;
-
-    // Longitude of drone show coordinate system, in 1e-7 degrees
-    int32_t _origin_lng;
-
-    // Altitude of the origin of the drone show coordinate system above mean
-    // sea level, in millimeters.
-    // Valid only if and only if _origin_amsL_is_valid is set to true.
-    int32_t _origin_amsl;
-
-    // Stores whether the origin of the drone show coordinate system is valid.
-    // The show is controlled in AMSL when the origin is valid, otherwise
-    // it is controlled in AGL.
-    bool _origin_amsl_is_valid;
-
-    // Orientation of drone show coordinate system, in radians. Copied from the
-    // parameters set by the user when the drone takes off.
-    float _orientation_rad;
+    // Properties of the drone show coordinate system, used in-flight. Updated
+    // from the parameters set by the user when the drone takes off.
+    ShowCoordinateSystem _show_coordinate_system;
 
     // Reason why the start time was set to the current value; used to decide whether
     // it should be cleared when the drone show mode is restarted
@@ -371,6 +390,10 @@ private:
 
     // Start time of the show, in microseconds, as a UNIX timestamp, zero if unset.
     uint64_t _start_time_usec;
+
+    // Takeoff position, in local coordinates, relative to the show coordinate system.
+    // Zero if no show data is loaded. Units are in millimeters.
+    Vector3f _takeoff_position_mm;
 
     // Time when we need to take off, relative to the start of the show, in seconds
     float _takeoff_time_sec;
@@ -442,6 +465,13 @@ private:
 
     // Clears the start time of the drone show if it was set by the user with the RC switch
     void _clear_start_time_if_set_by_switch();
+
+    // Copies the settings of the show coordinate system from the parameter section
+    // to the given variable. Returns false if the show coordinate system was not
+    // specified by the user yet.
+    bool _copy_show_coordinate_system_from_parameters_to(
+        ShowCoordinateSystem& coordinate_system
+    ) const WARN_IF_UNUSED;
 
     // Produces an internally triggered light signal that indicates a failed
     // operation (like a successful compass calibration)
