@@ -778,7 +778,6 @@ bool ModeDroneShow::send_guided_mode_command_during_performance()
     float elapsed = copter.g2.drone_show_manager.get_elapsed_time_since_start_sec();
 
     copter.g2.drone_show_manager.get_desired_global_position_at_seconds(elapsed, loc);
-    copter.g2.drone_show_manager.get_desired_velocity_neu_in_cms_per_seconds_at_seconds(elapsed, vel);
 
     if (loc.get_vector_from_origin_NEU(pos))
     {
@@ -791,12 +790,17 @@ bool ModeDroneShow::send_guided_mode_command_during_performance()
 
         if (copter.g2.drone_show_manager.is_velocity_control_enabled())
         {
-            copter.mode_guided.set_destination_posvel(pos, vel);
+            copter.g2.drone_show_manager.get_desired_velocity_neu_in_cms_per_seconds_at_seconds(elapsed, vel);
         }
         else
         {
-            copter.mode_guided.set_destination(pos);
+            vel.zero();
         }
+
+        // copter.mode_guided.set_destination() is for waypoint-based control.
+        // Position control is achieved on our side by clearing the velocity
+        // feed-forward terms to zero.
+        copter.mode_guided.set_destination_posvel(pos, vel);
 
         return true;
     }
