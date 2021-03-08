@@ -15,6 +15,7 @@ public:
     AC_DroneShowManager_Copter(const AC_DroneShowManager_Copter &other) = delete;
     AC_DroneShowManager_Copter &operator=(const AC_DroneShowManager_Copter&) = delete;
 
+    virtual bool _get_current_location(Location& loc) const override;
     virtual void _request_switch_to_show_mode() override;
     
 };

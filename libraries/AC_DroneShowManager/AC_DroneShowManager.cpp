@@ -51,6 +51,10 @@
 // Largest valid value of show AMSL. Values smaller than this are considered invalid.
 #define LARGEST_VALID_AMSL 10000000
 
+// Tolerance threshold in takeoff placement, in meters. The drone will not take off
+// if it is placed farther than this distance from its takeoff position.
+#define TAKEOFF_PLACEMENT_TOLERANCE_METERS 2.0f
+
 // Group mask indicating all groups
 #define ALL_GROUPS 0
 
@@ -451,7 +455,12 @@ bool AC_DroneShowManager::get_global_takeoff_position(Location& loc) const
         return false;
     }
 
+    vec.x = _takeoff_position_mm.x;
+    vec.y = _takeoff_position_mm.y;
+    vec.z = _takeoff_position_mm.z;
+
     coordinate_system.convert_show_to_global_coordinate(vec, loc);
+
     return true;
 }
 
@@ -677,6 +686,11 @@ void AC_DroneShowManager::notify_landed()
 
 bool AC_DroneShowManager::notify_takeoff_attempt()
 {
+    if (!_is_prepared_to_take_off())
+    {
+        return false;
+    }
+    
     return _copy_show_coordinate_system_from_parameters_to(_show_coordinate_system);
 }
 
@@ -716,9 +730,10 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
     const AP_GPS& gps = AP::gps();
 
     uint8_t packet[16] = { 0x62, };
-    uint8_t flags, gps_health;
+    uint8_t flags, flags2, gps_health;
     float elapsed_time;
     int16_t encoded_elapsed_time;
+    DroneShowModeStage stage = get_stage_in_drone_show_mode();
 
     /* make sure that we can make use of MAVLink packet truncation */
     memset(packet, 0, sizeof(uint8_t));
@@ -747,6 +762,18 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
         flags |= (1 << 1);
     }
 
+    /* calculate second byte of status flags */
+    flags2 = static_cast<uint8_t>(stage) & 0x0f;
+    /* the remaining bits represent status information that is relevant only
+     * if we are about to take off; they encode whether there are any errors
+     * that would prevent us from taking off now -- expect _is_gps_time_ok(),
+     * which is in the other flag byte because of historical reasons */
+    if (stage == DroneShow_WaitForStartTime) {
+        if (has_explicit_show_origin_set_by_user() && !_is_at_takeoff_position()) {
+            flags2 |= (1 << 7);
+        }
+    }
+
     /* calculate GPS health */
     gps_health = gps.status();
     if (gps_health > 7) {
@@ -768,7 +795,7 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
     *(( int32_t*) (packet + 0)) = _params.start_time_gps_sec;
     *((uint16_t*) (packet + 4)) = sb_rgb_color_encode_rgb565(_last_rgb_led_color);
     packet[6] = flags;
-    packet[7] = static_cast<uint8_t>(_stage_in_drone_show_mode) & 0x0f;
+    packet[7] = flags2;
     packet[8] = gps_health;
     packet[9] = _boot_count & 0x03; // upper 6 bits are unused yet
     *(( int16_t*) (packet + 10)) = encoded_elapsed_time;
@@ -1211,6 +1238,27 @@ bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& m
     return true;
 }
 
+bool AC_DroneShowManager::_is_at_takeoff_position() const
+{
+    Location current_loc;
+    Location takeoff_loc;
+
+    if (!_get_current_location(current_loc))
+    {
+        // EKF does not know its own position yet so we report that we are not
+        // at the takeoff position as it would not be safe to take off anyway
+        return false;
+    }
+
+    if (!get_global_takeoff_position(takeoff_loc))
+    {
+        // Show coordinate system not set up yet
+        return false;
+    }
+
+    return current_loc.get_distance(takeoff_loc) <= TAKEOFF_PLACEMENT_TOLERANCE_METERS;
+}
+
 bool AC_DroneShowManager::_is_gps_time_ok() const
 {
     // AP::gos().time_week() starts from zero and gets set to a non-zero value
@@ -1218,6 +1266,15 @@ bool AC_DroneShowManager::_is_gps_time_ok() const
     // that the GPS subsystem receives iTOW information from the GPS module but
     // no week number; we deem this unreliable so we return false in this case.
     return AP::gps().time_week() > 0;
+}
+
+bool AC_DroneShowManager::_is_prepared_to_take_off() const
+{
+    return (
+        _stage_in_drone_show_mode == DroneShow_WaitForStartTime &&
+        _is_at_takeoff_position() &&
+        _is_gps_time_ok()
+    );
 }
 
 bool AC_DroneShowManager::_load_show_file_from_storage()
@@ -1354,64 +1411,13 @@ bool AC_DroneShowManager::_load_show_file_from_storage()
     return success;
 }
 
-void AC_DroneShowManager::_set_light_program_and_take_ownership(sb_light_program_t *value)
-{
-    sb_light_player_destroy(_light_player);
-    sb_light_program_destroy(_light_program);
-
-    if (value)
-    {
-        *_light_program = *value;
-        _light_program_valid = true;
-    }
-    else
-    {
-        sb_light_program_init_empty(_light_program);
-        _light_program_valid = false;
-    }
-
-    sb_light_player_init(_light_player, _light_program);
-}
-
-void AC_DroneShowManager::_set_show_data_and_take_ownership(uint8_t *value)
-{
-    if (_show_data == value)
-    {
-        return;
-    }
-
-    if (_show_data)
-    {
-        free(_show_data);
-    }
-
-    _show_data = value;
-}
-
-void AC_DroneShowManager::_set_trajectory_and_take_ownership(sb_trajectory_t *value)
+void AC_DroneShowManager::_recalculate_trajectory_properties()
 {
     sb_vector3_with_yaw_t vec;
-
-    sb_trajectory_player_destroy(_trajectory_player);
-    sb_trajectory_destroy(_trajectory);
-
-    if (value)
-    {
-        *_trajectory = *value;
-        _trajectory_valid = true;
-    }
-    else
-    {
-        sb_trajectory_init_empty(_trajectory);
-        _trajectory_valid = false;
-    }
-
-    sb_trajectory_player_init(_trajectory_player, _trajectory);
 
     if (sb_trajectory_player_get_position_at(_trajectory_player, 0, &vec) != SB_SUCCESS)
     {
         // Error while retrieving the first position
-        _trajectory_valid = false;
         vec.x = vec.y = vec.z = 0;
     }
 
@@ -1448,6 +1454,61 @@ void AC_DroneShowManager::_set_trajectory_and_take_ownership(sb_trajectory_t *va
         // This should ensure that has_valid_takeoff_time() returns false
         _landing_time_sec = _takeoff_time_sec = -1;
     }
+}
+
+void AC_DroneShowManager::_set_light_program_and_take_ownership(sb_light_program_t *value)
+{
+    sb_light_player_destroy(_light_player);
+    sb_light_program_destroy(_light_program);
+
+    if (value)
+    {
+        *_light_program = *value;
+        _light_program_valid = true;
+    }
+    else
+    {
+        sb_light_program_init_empty(_light_program);
+        _light_program_valid = false;
+    }
+
+    sb_light_player_init(_light_player, _light_program);
+}
+
+void AC_DroneShowManager::_set_show_data_and_take_ownership(uint8_t *value)
+{
+    if (_show_data == value)
+    {
+        return;
+    }
+
+    if (_show_data)
+    {
+        free(_show_data);
+    }
+
+    _show_data = value;
+}
+
+void AC_DroneShowManager::_set_trajectory_and_take_ownership(sb_trajectory_t *value)
+{
+    sb_trajectory_player_destroy(_trajectory_player);
+    sb_trajectory_destroy(_trajectory);
+
+    if (value)
+    {
+        *_trajectory = *value;
+        _trajectory_valid = true;
+    }
+    else
+    {
+        sb_trajectory_init_empty(_trajectory);
+        _trajectory_valid = false;
+    }
+
+    sb_trajectory_player_init(_trajectory_player, _trajectory);
+
+    _recalculate_trajectory_properties();
 }
 
 void AC_DroneShowManager::_update_lights()

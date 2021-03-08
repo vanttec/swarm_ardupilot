@@ -484,6 +484,9 @@ private:
     // Flashes the LEDs of the drone with the given color
     void _flash_leds_with_color(uint8_t red, uint8_t green, uint8_t blue, uint8_t count, LightEffectPriority priority);
 
+    // Retrieves the current location of the vehicle from the EKF
+    virtual bool _get_current_location(Location& loc) const { return false; }
+
     // Handles a generic MAVLink DATA* message from the ground station.
     bool _handle_custom_data_message(uint8_t type, void* data, uint8_t length);
 
@@ -502,9 +505,21 @@ private:
     // Handles a MAVLink LED_CONTROL message from the ground station.
     bool _handle_led_control_message(const mavlink_message_t& msg);
 
+    // Returns whether the drone is close enough to its start position
+    bool _is_at_takeoff_position() const;
+    
     // Returns whether the GPS fix of the drone is good enough so we can trust
     // that it has accurate tiem information.
     bool _is_gps_time_ok() const;
+
+    // Returns whether the drone is prepared to take off. This function provides
+    // valid results only if the drone is in the "waiting for start time" stage;
+    // otherwise it returns false unconditionally.
+    bool _is_prepared_to_take_off() const;
+
+    // Recalculates the values of some internal variables that are derived from
+    // the current trajectory when it is loaded.
+    void _recalculate_trajectory_properties();
 
     // Requests the vehicle to switch to drone show mode.
     virtual void _request_switch_to_show_mode() {};

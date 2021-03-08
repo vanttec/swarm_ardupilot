@@ -6,7 +6,13 @@
  * Implementation of drone show flight mode
  */
 
-void AC_DroneShowManager_Copter::_request_switch_to_show_mode() {
+bool AC_DroneShowManager_Copter::_get_current_location(Location& loc) const
+{
+    return copter.ahrs.get_location(loc);
+}
+
+void AC_DroneShowManager_Copter::_request_switch_to_show_mode()
+{
     // Drone show manager requested the copter to switch to show mode. We do this
     // only if the motors are not armed.
     if (!copter.motors->armed()) {
