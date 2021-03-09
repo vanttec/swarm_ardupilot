@@ -696,6 +696,11 @@ bool AC_DroneShowManager::notify_takeoff_attempt()
 
 bool AC_DroneShowManager::reload_or_clear_show(bool do_clear)
 {
+    // Don't reload or clear the show if the motors are armed
+    if (AP::motors()->armed()) {
+        return false;
+    }
+
     if (do_clear) {
         if (AP::FS().unlink(SHOW_FILE)) {
             // Error while removing the file; did it exist?
@@ -708,21 +713,12 @@ bool AC_DroneShowManager::reload_or_clear_show(bool do_clear)
         }
     }
 
-    return reload_show_from_storage();
+    return _load_show_file_from_storage();
 }
 
 bool AC_DroneShowManager::reload_show_from_storage()
 {
-    // Don't reload the show if the motors are armed
-    if (AP::motors()->armed()) {
-        return false;
-    }
-
-    // This will return whether a new show was loaded, but we want to return
-    // success even if there is no show file, so the return value is ignored
-    _load_show_file_from_storage();
-
-    return true;
+    return reload_or_clear_show(/* do_clear = */ false);
 }
 
 void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) const
@@ -1295,7 +1291,9 @@ bool AC_DroneShowManager::_load_show_file_from_storage()
     retval = AP::FS().stat(SHOW_FILE, &stat_data);
     if (retval)
     {
-        return false;
+        // Show file does not exist. This basically means that the operation
+        // was successful.
+        return true;
     }
 
     // Ensure that we have a sensible block size that we will use when reading

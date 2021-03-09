@@ -274,7 +274,10 @@ public:
     // Handler for the MAVLink CMD_USER1 message that allows the user to reload _or_ clear the show
     bool reload_or_clear_show(bool do_clear) WARN_IF_UNUSED;
 
-    // Asks the drone show manager to reload the show file from the storage
+    // Asks the drone show manager to reload the show file from the storage. Returns true
+    // if the show file was reloaded successfully, _or_ if there is no file on the storage
+    // at all. Returns false if the motors are running, the show file is corrupted or
+    // there was an IO error.
     bool reload_show_from_storage() WARN_IF_UNUSED;
 
     // Sends a drone show status message (wrapped in a DATA16 packet) on the given MAVLink channel
