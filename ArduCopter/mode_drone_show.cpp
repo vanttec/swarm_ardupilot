@@ -638,8 +638,10 @@ bool ModeDroneShow::landing_completed() const
 {
     if (_stage == DroneShow_Landing) {
         return (
-            copter.ap.land_complete &&
-            motors->get_spool_state() == AP_Motors::SpoolState::GROUND_IDLE
+            copter.ap.land_complete && (
+                motors->get_spool_state() == AP_Motors::SpoolState::GROUND_IDLE ||
+                motors->get_spool_state() == AP_Motors::SpoolState::SHUT_DOWN
+            )
         );
     } else {
         return false;
