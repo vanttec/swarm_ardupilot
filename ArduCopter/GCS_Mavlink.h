@@ -68,4 +68,6 @@ private:
     void send_winch_status() const override;
 
     void send_wind() const;
+
+    virtual void initialise_custom_message_intervals() override;
 };

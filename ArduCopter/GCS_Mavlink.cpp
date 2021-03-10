@@ -1453,3 +1453,16 @@ void GCS_MAVLINK_Copter::send_wind() const
         wind.length(),
         wind.z);
 }
+
+void GCS_MAVLINK_Copter::initialise_custom_message_intervals()
+{
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // In drone show mode, we start some additional telemetry automatically at
+    // startup so the GCS does not have to spend time on setting it up.
+    // 500000 us = 0.5 sec, i.e. 2 Hz
+    set_message_interval(MAVLINK_MSG_ID_DATA16, 500000);
+    set_message_interval(MAVLINK_MSG_ID_GLOBAL_POSITION_INT, 500000);
+    set_message_interval(MAVLINK_MSG_ID_SYS_STATUS, 1000000);
+    set_message_interval(MAVLINK_MSG_ID_GPS_RAW_INT, 1000000);
+#endif
+}

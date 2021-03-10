@@ -1086,6 +1086,10 @@ void GCS_MAVLINK::update_send()
 
     if (!deferred_messages_initialised) {
         initialise_message_intervals_from_streamrates();
+
+        // allow further customization of message intervals in derived classes
+        initialise_custom_message_intervals();
+
         deferred_messages_initialised = true;
     }
 
@@ -5165,10 +5169,6 @@ void GCS_MAVLINK::initialise_message_intervals_from_streamrates()
         initialise_message_intervals_for_stream(all_stream_entries[i].stream_id);
     }
     set_mavlink_message_id_interval(MAVLINK_MSG_ID_HEARTBEAT, 1000);
-
-    // TODO(ntamas): this should be conditional on MODE_DRONE_SHOW_ENABLED == ENABLED
-    // but it is not available in this file
-    set_mavlink_message_id_interval(MAVLINK_MSG_ID_DATA16, 1000);
 }
 
 bool GCS_MAVLINK::get_default_interval_for_ap_message(const ap_message id, uint16_t &interval) const

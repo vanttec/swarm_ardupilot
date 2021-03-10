@@ -656,6 +656,10 @@ private:
     // the interval specified in "deferred"
     uint16_t get_reschedule_interval_ms(const deferred_message_bucket_t &deferred) const;
 
+    // hook function to allow customization of message intervals in derived
+    // classes
+    virtual void initialise_custom_message_intervals() {};
+
     bool do_try_send_message(const ap_message id);
 
     // time when we missed sending a parameter for GCS
