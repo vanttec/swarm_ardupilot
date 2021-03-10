@@ -375,7 +375,7 @@ void ModeDroneShow::wait_for_start_time_run()
                 // and we keep on doing so until 5 seconds after the takeoff time, when
                 // we give up
                 if (time_since_takeoff_sec < latest_takeoff_attempt_after_scheduled_takeoff_time_in_seconds) {
-                    if (start_motors_if_needed()) {
+                    if (copter.g2.drone_show_manager.is_prepared_to_take_off() && start_motors_if_needed()) {
                         // Great, motors started
                         _motors_started = true;
                     }

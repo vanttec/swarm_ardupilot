@@ -43,6 +43,18 @@ enum DroneShowControlModeFlag {
     DroneShowControl_VelocityControlEnabled = 1
 };
 
+// Flags representing various failures in drone show specific preflight checks.
+// These are not part of the standard ArduPilot prearm check framework; we
+// check these periodically on our own when we are in the "waiting for start
+// time" stage.
+//
+// The numeric values are important; these flags are sent in a status packet
+// where the four LSBs of the same byte are reserved for something else, so
+// we can only use the upper four bits
+enum DroneShowPreflightCheckFlag {
+    DroneShowPreflightCheck_NotAtTakeoffPosition = (1 << 7)
+};
+
 // Light effect type when the lights are driven from the GCS
 enum LightEffectType {
     LightEffect_Off,
@@ -92,7 +104,10 @@ private:
 
         // Converts a coordinate given in the show coordinate system, in millimeters, to
         // the global GPS coordinate system
-        void convert_show_to_global_coordinate(sb_vector3_with_yaw_t vec, Location& loc);
+        void convert_show_to_global_coordinate(sb_vector3_with_yaw_t vec, Location& loc) const;
+
+        // Returns whether the coordinate system is valid.
+        bool is_valid() const { return origin_lat != 0 && origin_lng != 0; };
     };
 
 public:
@@ -242,6 +257,11 @@ public:
         return _params.group_index == index;
     }
 
+    // Returns whether the drone is prepared to take off. This function provides
+    // valid results only if the drone is in the "waiting for start time" stage;
+    // otherwise it returns false unconditionally.
+    bool is_prepared_to_take_off() const;
+
     // Returns whether the velocity control mode is enabled
     bool is_velocity_control_enabled() const {
         return _params.control_mode_flags & DroneShowControl_VelocityControlEnabled;
@@ -329,7 +349,7 @@ private:
         AP_Int32 origin_lng;
 
         // Altitude of drone show coordinate system above mean sea level, in millimeters, as set in the parameters by the user
-        AP_Int32 origin_amsl;
+        AP_Int32 origin_amsl_mm;
 
         // Orientation of drone show coordinate system, in degrees, as set in the parameters by the user
         AP_Float orientation_deg;
@@ -383,9 +403,19 @@ private:
     struct sb_light_player_s* _light_player;
     bool _light_program_valid;
 
+    // Result of the drone show specific preflight checks. Updated periodically
+    // from _update_preflight_check_result(). See the values from the
+    // DroneShowPreflightCheckFlag enum for more details.
+    uint8_t _preflight_check_failures;
+
     // Properties of the drone show coordinate system, used in-flight. Updated
     // from the parameters set by the user when the drone takes off.
     ShowCoordinateSystem _show_coordinate_system;
+
+    // Properties of the tentative drone show coordinate system, set up by the
+    // user and periodically updated from the parameters. Note that this is
+    // _not_ the same as _show_coordinate_system, which is used in-flight.
+    ShowCoordinateSystem _tentative_show_coordinate_system;
 
     // Reason why the start time was set to the current value; used to decide whether
     // it should be cleared when the drone show mode is restarted
@@ -474,7 +504,7 @@ private:
     // specified by the user yet.
     bool _copy_show_coordinate_system_from_parameters_to(
         ShowCoordinateSystem& coordinate_system
-    ) const WARN_IF_UNUSED;
+    ) const;
 
     // Produces an internally triggered light signal that indicates a failed
     // operation (like a successful compass calibration)
@@ -515,11 +545,6 @@ private:
     // that it has accurate tiem information.
     bool _is_gps_time_ok() const;
 
-    // Returns whether the drone is prepared to take off. This function provides
-    // valid results only if the drone is in the "waiting for start time" stage;
-    // otherwise it returns false unconditionally.
-    bool _is_prepared_to_take_off() const;
-
     // Recalculates the values of some internal variables that are derived from
     // the current trajectory when it is loaded.
     void _recalculate_trajectory_properties();
@@ -535,6 +560,11 @@ private:
     // Updates the state of the LED light on the drone. This has to be called
     // regularly at 25 Hz
     void _update_lights();
+
+    // Checks for error conditions that we can detect on the drone such as not
+    // being in the designated start position before takeoff. This has to be
+    // called regularly, but it is rate-limited to 1 Hz
+    void _update_preflight_check_result(bool force = 0);
 
     // Updates the RGB LED instance that is used as an output. Note that this
     // function updates the identity of the RGB LED object based on the current

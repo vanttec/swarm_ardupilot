@@ -139,7 +139,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Increment: 1
     // @Units: mm
     // @User: Standard
-    AP_GROUPINFO("ORIGIN_AMSL", 12, AC_DroneShowManager, _params.origin_amsl, SMALLEST_VALID_AMSL - 1),
+    AP_GROUPINFO("ORIGIN_AMSL", 12, AC_DroneShowManager, _params.origin_amsl_mm, SMALLEST_VALID_AMSL - 1),
 
     // @Param: ORIENTATION
     // @DisplayName: Orientation
@@ -188,7 +188,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Param: PRE_LIGHTS
     // @DisplayName: Brightness of preflight check related lights
     // @Description: Controls the brightness of light signals on the drone that are used to report status information when the drone is on the ground
-    // @Range: 0 4
+    // @Range: 0 3
     // @Increment: 1
     // @User: Standard
     AP_GROUPINFO("PRE_LIGHTS", 10, AC_DroneShowManager, _params.preflight_light_signal_brightness, 2),
@@ -338,7 +338,7 @@ bool AC_DroneShowManager::configure_show_coordinate_system(
     // should go through in a few milliseconds.
     _params.origin_lat.set_and_save(lat);
     _params.origin_lng.set_and_save(lng);
-    _params.origin_amsl.set_and_save(amsl_mm);
+    _params.origin_amsl_mm.set_and_save(amsl_mm);
     _params.orientation_deg.set_and_save(orientation_deg);
 
     // Log the new values
@@ -448,9 +448,8 @@ bool AC_DroneShowManager::get_global_takeoff_position(Location& loc) const
     // need to take the parameters provided by the user, convert them into a
     // ShowCoordinateSystem object, and then use that to get the GPS coordinates
     sb_vector3_with_yaw_t vec;
-    ShowCoordinateSystem coordinate_system;
 
-    if (!_copy_show_coordinate_system_from_parameters_to(coordinate_system))
+    if (!_tentative_show_coordinate_system.is_valid())
     {
         return false;
     }
@@ -459,7 +458,7 @@ bool AC_DroneShowManager::get_global_takeoff_position(Location& loc) const
     vec.y = _takeoff_position_mm.y;
     vec.z = _takeoff_position_mm.z;
 
-    coordinate_system.convert_show_to_global_coordinate(vec, loc);
+    _tentative_show_coordinate_system.convert_show_to_global_coordinate(vec, loc);
 
     return true;
 }
@@ -636,7 +635,7 @@ bool AC_DroneShowManager::has_authorization_to_start() const
 
 bool AC_DroneShowManager::has_explicit_show_altitude_set_by_user() const
 {
-    return _params.origin_amsl >= SMALLEST_VALID_AMSL;
+    return _params.origin_amsl_mm >= SMALLEST_VALID_AMSL;
 }
 
 bool AC_DroneShowManager::has_explicit_show_orientation_set_by_user() const
@@ -663,7 +662,15 @@ void AC_DroneShowManager::notify_drone_show_mode_initialized()
 
 void AC_DroneShowManager::notify_drone_show_mode_entered_stage(DroneShowModeStage stage)
 {
+    if (stage == _stage_in_drone_show_mode) {
+        return;
+    }
+
     _stage_in_drone_show_mode = stage;
+
+    // Force-update preflight checks so we see the errors immediately if we
+    // switched to the "waiting for start time" stage
+    _update_preflight_check_result(/* force = */ true);
 }
 
 void AC_DroneShowManager::notify_drone_show_mode_exited()
@@ -686,7 +693,7 @@ void AC_DroneShowManager::notify_landed()
 
 bool AC_DroneShowManager::notify_takeoff_attempt()
 {
-    if (!_is_prepared_to_take_off())
+    if (!is_prepared_to_take_off())
     {
         return false;
     }
@@ -759,16 +766,8 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
     }
 
     /* calculate second byte of status flags */
-    flags2 = static_cast<uint8_t>(stage) & 0x0f;
-    /* the remaining bits represent status information that is relevant only
-     * if we are about to take off; they encode whether there are any errors
-     * that would prevent us from taking off now -- expect _is_gps_time_ok(),
-     * which is in the other flag byte because of historical reasons */
-    if (stage == DroneShow_WaitForStartTime) {
-        if (has_explicit_show_origin_set_by_user() && !_is_at_takeoff_position()) {
-            flags2 |= (1 << 7);
-        }
-    }
+    flags2 = _preflight_check_failures & 0xf0;
+    flags2 |= static_cast<uint8_t>(stage) & 0x0f;
 
     /* calculate GPS health */
     gps_health = gps.status();
@@ -852,6 +851,7 @@ void AC_DroneShowManager::update()
     _check_changes_in_parameters();
     _check_events();
     _check_radio_failsafe();
+    _update_preflight_check_result();
     _update_lights();
 }
 
@@ -860,11 +860,33 @@ void AC_DroneShowManager::_check_changes_in_parameters()
     static int32_t last_seen_start_time_gps_sec = -1;
     static bool last_seen_show_authorization_state = false;
     static int16_t last_seen_control_rate_hz = DEFAULT_UPDATE_RATE_HZ;
+    static int32_t last_seen_origin_lat = 200000000;        // intentionally invalid
+    static int32_t last_seen_origin_lng = 200000000;        // intentionally invalid
+    static int32_t last_seen_origin_amsl_mm = -200000000;  // intentionally invalid
+    static float last_seen_orientation_deg = INFINITY;      // intentionally invalid
     uint32_t start_time_gps_msec;
 
     bool new_control_rate_pending = _params.control_rate_hz != last_seen_control_rate_hz;    
+    bool new_coordinate_system_pending = (
+        _params.origin_lat != last_seen_origin_lat ||
+        _params.origin_lng != last_seen_origin_lng ||
+        _params.origin_amsl_mm != last_seen_origin_amsl_mm ||
+        !is_zero(_params.orientation_deg - last_seen_orientation_deg)
+    );
     bool new_start_time_pending = _params.start_time_gps_sec != last_seen_start_time_gps_sec;
     bool new_show_authorization_pending = _params.authorized_to_start != last_seen_show_authorization_state;
+
+    if (new_coordinate_system_pending) {
+        // We can safely mess around with the coordinate system as we are only
+        // updating the _tentative_ coordinate system here, which will take
+        // effect at the next takeoff only.
+        last_seen_origin_lat = _params.origin_lat;
+        last_seen_origin_lng = _params.origin_lng;
+        last_seen_origin_amsl_mm = _params.origin_amsl_mm;
+        last_seen_orientation_deg = _params.orientation_deg;
+
+        _copy_show_coordinate_system_from_parameters_to(_tentative_show_coordinate_system);
+    }
 
     if (new_start_time_pending) {
         // We don't allow the user to mess around with the start time if we are
@@ -989,7 +1011,7 @@ bool AC_DroneShowManager::_copy_show_coordinate_system_from_parameters_to(
     _coordinate_system.origin_lng = static_cast<int32_t>(_params.origin_lng);
 
     if (has_explicit_show_altitude_set_by_user()) {
-        _coordinate_system.origin_amsl_mm = _params.origin_amsl;
+        _coordinate_system.origin_amsl_mm = _params.origin_amsl_mm;
         if (_coordinate_system.origin_amsl_mm >= LARGEST_VALID_AMSL) {
             _coordinate_system.origin_amsl_mm = LARGEST_VALID_AMSL;
         }
@@ -1239,6 +1261,12 @@ bool AC_DroneShowManager::_is_at_takeoff_position() const
     Location current_loc;
     Location takeoff_loc;
 
+    if (!_tentative_show_coordinate_system.is_valid())
+    {
+        // User did not set up the takeoff position yet
+        return false;
+    }
+
     if (!_get_current_location(current_loc))
     {
         // EKF does not know its own position yet so we report that we are not
@@ -1264,11 +1292,11 @@ bool AC_DroneShowManager::_is_gps_time_ok() const
     return AP::gps().time_week() > 0;
 }
 
-bool AC_DroneShowManager::_is_prepared_to_take_off() const
+bool AC_DroneShowManager::is_prepared_to_take_off() const
 {
     return (
         _stage_in_drone_show_mode == DroneShow_WaitForStartTime &&
-        _is_at_takeoff_position() &&
+        !_preflight_check_failures &&
         _is_gps_time_ok()
     );
 }
@@ -1509,6 +1537,30 @@ void AC_DroneShowManager::_set_trajectory_and_take_ownership(sb_trajectory_t *va
     _recalculate_trajectory_properties();
 }
 
+void AC_DroneShowManager::_update_preflight_check_result(bool force)
+{
+    static uint32_t last_updated_at = 0;
+
+    uint32_t now = AP_HAL::millis();
+    if (!force && (now - last_updated_at) < 1000) {
+        return;
+    }
+
+    last_updated_at = now;
+
+    _preflight_check_failures = 0;
+
+    if (_stage_in_drone_show_mode != DroneShow_WaitForStartTime) {
+        /* We are not in the "waiting for start time" stage so we don't perform
+         * any checks */
+        return;
+    }
+
+    if (_tentative_show_coordinate_system.is_valid() && !_is_at_takeoff_position()) {
+        _preflight_check_failures |= DroneShowPreflightCheck_NotAtTakeoffPosition;
+    }
+}
+
 void AC_DroneShowManager::_update_lights()
 {
     // TODO(ntamas): mode numbers are hardcoded here; we cannot import them
@@ -1613,11 +1665,16 @@ void AC_DroneShowManager::_update_lights()
             //
             // TODO(ntamas): what if we were late to the party and we are loitering
             // only?
-            elapsed_time = get_elapsed_time_since_start_sec();
-            if (elapsed_time >= 0) {
-                get_color_of_rgb_light_at_seconds(elapsed_time, &color);
+            if (_stage_in_drone_show_mode == DroneShow_Error) {
+                color = Colors::RED;
+                pattern = BLINK;
             } else {
-                color = Colors::WHITE_DIM;
+                elapsed_time = get_elapsed_time_since_start_sec();
+                if (elapsed_time >= 0) {
+                    get_color_of_rgb_light_at_seconds(elapsed_time, &color);
+                } else {
+                    color = Colors::WHITE_DIM;
+                }
             }
         } else {
             // Otherwise, show a bright white color so we can see the drone from the ground
@@ -1668,13 +1725,20 @@ void AC_DroneShowManager::_update_lights()
             // Drone show mode is distinguished from the rest by a pulsating
             // light ("breathing" pattern).
 
+            // Preflight check failures --> slow pulsating yellow light
             // No authorization yet --> slow pulsating blue light; dark if no
             // start time was set, not-so-dark if some start time was set
             // Authorized, far from start --> slow pulsating green light
             // Authorized, about to start --> green flashes, twice per second,
             // synced to GPS
 
-            if (has_authorization_to_start()) {
+            if (_stage_in_drone_show_mode == DroneShow_Error) {
+                color = Colors::RED;
+                pattern = BLINK;
+            } else if (_preflight_check_failures) {
+                color = Colors::YELLOW;
+                pulse = 0.5;
+            } else if (has_authorization_to_start()) {
                 if (get_time_until_landing_sec() < 0) {
                     // if we have already landed but show mode is reset from
                     // another mode, we just keep calm with solid green
@@ -1819,7 +1883,7 @@ void AC_DroneShowManager::ShowCoordinateSystem::clear()
 
 void AC_DroneShowManager::ShowCoordinateSystem::convert_show_to_global_coordinate(
     sb_vector3_with_yaw_t vec, Location& loc
-) {
+) const {
     float offset_north, offset_east, altitude;
     
     // We need to rotate the X axis by -orientation_rad radians so it points
