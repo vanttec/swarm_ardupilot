@@ -48,11 +48,17 @@ enum DroneShowControlModeFlag {
 // check these periodically on our own when we are in the "waiting for start
 // time" stage.
 //
-// The numeric values are important; these flags are sent in a status packet
-// where the four LSBs of the same byte are reserved for something else, so
-// we can only use the upper four bits
+// The numeric values are important. In the status packet we have four bits to
+// send information about preflight checks, but some things that are checked in
+// the preflight code are also sent in the status packet in other places (due to
+// historical reasons). The flags that must be sent in those four bits that we
+// have available for preflight check information must have values >= 16. Sorry,
+// this is a bit of a mess but we need to keep backwards compatibility.
 enum DroneShowPreflightCheckFlag {
-    DroneShowPreflightCheck_NotAtTakeoffPosition = (1 << 7)
+    DroneShowPreflightCheck_ShowNotConfiguredYet = (1 << 0),
+    // Flags from this point onwards are sent in the dedicated four bits of the
+    // status packet
+    DroneShowPreflightCheck_NotAtTakeoffPosition = (1 << 7),
 };
 
 // Light effect type when the lights are driven from the GCS

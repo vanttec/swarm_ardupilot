@@ -1556,6 +1556,14 @@ void AC_DroneShowManager::_update_preflight_check_result(bool force)
         return;
     }
 
+    if (
+        !loaded_show_data_successfully() ||
+        !has_explicit_show_origin_set_by_user() ||
+        !has_explicit_show_orientation_set_by_user()
+    ) {
+        _preflight_check_failures |= DroneShowPreflightCheck_ShowNotConfiguredYet;
+    }
+
     if (_tentative_show_coordinate_system.is_valid() && !_is_at_takeoff_position()) {
         _preflight_check_failures |= DroneShowPreflightCheck_NotAtTakeoffPosition;
     }
