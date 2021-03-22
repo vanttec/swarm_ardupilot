@@ -51,9 +51,9 @@
 // Largest valid value of show AMSL. Values smaller than this are considered invalid.
 #define LARGEST_VALID_AMSL 10000000
 
-// Tolerance threshold in takeoff placement, in meters. The drone will not take off
-// if it is placed farther than this distance from its takeoff position.
-#define TAKEOFF_PLACEMENT_TOLERANCE_METERS 2.0f
+// Default takeoff placement error tolerance level, in meters. The drone will not
+// take off if it is placed farther than this distance from its takeoff position.
+#define DEFAULT_XY_PLACEMENT_ERROR_METERS 3.0f
 
 // Group mask indicating all groups
 #define ALL_GROUPS 0
@@ -216,6 +216,14 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("CTRL_RATE", 14, AC_DroneShowManager, _params.control_rate_hz, DEFAULT_UPDATE_RATE_HZ),
+
+    // @Param: MAX_XY_ERR
+    // @DisplayName: Maximum placement error in XY direction
+    // @Description: Maximum placement error that we tolerate before takeoff, in meters. Zero to turn off XY placement accuracy checks.
+    // @Range: 0 20
+    // @Increment: 0.1
+    // @User: Standard
+    AP_GROUPINFO("MAX_XY_ERR", 15, AC_DroneShowManager, _params.max_xy_placement_error_m, DEFAULT_XY_PLACEMENT_ERROR_METERS),
 
     AP_GROUPEND
 };
@@ -1260,7 +1268,8 @@ bool AC_DroneShowManager::_is_at_takeoff_position() const
 {
     Location current_loc;
     Location takeoff_loc;
-
+    float xy_threshold;
+    
     if (!_tentative_show_coordinate_system.is_valid())
     {
         // User did not set up the takeoff position yet
@@ -1280,7 +1289,8 @@ bool AC_DroneShowManager::_is_at_takeoff_position() const
         return false;
     }
 
-    return current_loc.get_distance(takeoff_loc) <= TAKEOFF_PLACEMENT_TOLERANCE_METERS;
+    xy_threshold = _params.max_xy_placement_error_m;
+    return xy_threshold <= 0 || current_loc.get_distance(takeoff_loc) <= xy_threshold;
 }
 
 bool AC_DroneShowManager::_is_gps_time_ok() const

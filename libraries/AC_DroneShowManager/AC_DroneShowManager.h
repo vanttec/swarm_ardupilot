@@ -378,6 +378,9 @@ private:
         // Index of the group that this drone belongs to. Currently we support at most 8 groups, indexed from 0 to 7.
         AP_Int8 group_index;
 
+        // Maximum allowed placement error before takeoff in the XY plane, in meters.
+        AP_Float max_xy_placement_error_m;
+
         struct {
             // Specifies where the a given LED light channel of the show should be sent
             AP_Int8 type;
