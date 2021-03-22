@@ -225,6 +225,14 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("MAX_XY_ERR", 15, AC_DroneShowManager, _params.max_xy_placement_error_m, DEFAULT_XY_PLACEMENT_ERROR_METERS),
 
+    // @Param: VEL_FF_GAIN
+    // @DisplayName: Velocity feed-forward gain
+    // @Description: Multiplier used when mixing the desired velocity of the drone into the velocity target of the position controller
+    // @Range: 0 1
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("VEL_FF_GAIN", 16, AC_DroneShowManager, _params.velocity_feedforward_gain, 1.0f),
+
     AP_GROUPEND
 };
 

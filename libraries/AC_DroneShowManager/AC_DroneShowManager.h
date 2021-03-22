@@ -222,6 +222,9 @@ public:
     // Returns the number of seconds left until the time when we should land
     float get_time_until_landing_sec() const;
 
+    // Returns the velocity feed-forward gain factor to use during velocity control
+    float get_velocity_feedforward_gain() const { return _params.velocity_feedforward_gain; }
+
     // Handles a MAVLink user command forwarded to the drone show manager by the central MAVLink handler
     MAV_RESULT handle_command_int_packet(const mavlink_command_int_t &packet);
 
@@ -380,6 +383,9 @@ private:
 
         // Maximum allowed placement error before takeoff in the XY plane, in meters.
         AP_Float max_xy_placement_error_m;
+
+        // Velocity feed-forward gain when velocity control is being used.
+        AP_Float velocity_feedforward_gain;
 
         struct {
             // Specifies where the a given LED light channel of the show should be sent

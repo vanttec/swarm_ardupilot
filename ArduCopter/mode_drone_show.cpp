@@ -796,13 +796,17 @@ bool ModeDroneShow::send_guided_mode_command_during_performance()
         }
         */
 
+        vel.zero();
+
         if (copter.g2.drone_show_manager.is_velocity_control_enabled())
         {
-            copter.g2.drone_show_manager.get_desired_velocity_neu_in_cms_per_seconds_at_seconds(elapsed, vel);
-        }
-        else
-        {
-            vel.zero();
+            float gain = copter.g2.drone_show_manager.get_velocity_feedforward_gain();
+
+            if (gain > 0)
+            {
+                copter.g2.drone_show_manager.get_desired_velocity_neu_in_cms_per_seconds_at_seconds(elapsed, vel);
+                vel *= gain;
+            }
         }
 
         // copter.mode_guided.set_destination() is for waypoint-based control.
