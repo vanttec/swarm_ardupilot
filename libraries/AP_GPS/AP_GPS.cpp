@@ -1349,9 +1349,11 @@ void AP_GPS::handle_gps_rtcm_fragment(uint8_t flags, const uint8_t *data, uint8_
     const uint8_t sequence = (flags >> 3U) & 0x1F;
 
     // see if this fragment is consistent with existing fragments
-    if (rtcm_buffer->fragments_received &&
-        (rtcm_buffer->sequence != sequence ||
-         (rtcm_buffer->fragments_received & (1U<<fragment)))) {
+    // The original ArduPilot code discards the entire re-assembly buffer if
+    // it receives the same fragment twice. This can cause problems if multiple
+    // channels (e.g., wifi and radio) are used for redundancy, hence we turn
+    // off this check.
+    if (rtcm_buffer->fragments_received && rtcm_buffer->sequence != sequence) {
         // we have one or more partial fragments already received
         // which conflict with the new fragment, discard previous fragments
         rtcm_buffer->fragment_count = 0;
