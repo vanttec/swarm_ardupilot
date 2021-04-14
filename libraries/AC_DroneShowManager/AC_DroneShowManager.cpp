@@ -1595,6 +1595,7 @@ void AC_DroneShowManager::_update_lights()
     const uint32_t MODE_RTL = 6, MODE_SMART_RTL = 21, MODE_LAND = 9, MODE_DRONE_SHOW = 127;
     sb_rgb_color_t color = Colors::BLACK;
     bool light_signal_affected_by_brightness_setting = true;
+    int brightness = _params.preflight_light_signal_brightness;
     uint8_t pattern = 0b11111111;
     const uint8_t BLINK = 0b11110000;
     const uint8_t BLINK_TWICE_PER_SECOND = 0b11001100;
@@ -1628,6 +1629,12 @@ void AC_DroneShowManager::_update_lights()
     if (AP_Notify::flags.compass_cal_running) {
         color = Colors::MAGENTA;
         pulse = 0.5;
+
+        // Make sure that this light signal is visible with a minimum intensity
+        // if the user otherwise turned off the light signals
+        if (brightness < 1) {
+            brightness = 1;
+        }
     } else if (_light_signal.started_at_msec) {
         // If the user requested a light signal, it trumps everything except
         // the compass calibration.
@@ -1812,13 +1819,13 @@ void AC_DroneShowManager::_update_lights()
     if (light_signal_affected_by_brightness_setting) {
         uint8_t shift = 0;
 
-        if (_params.preflight_light_signal_brightness <= 0) {
+        if (brightness <= 0) {
             // <= 0 = completely off, shift by 8 bits
             shift = 8;
-        } else if (_params.preflight_light_signal_brightness == 1) {
+        } else if (brightness == 1) {
             // 1 = low brightness, keep the 6 MSB so the maximum is 64
             shift = 2;
-        } else if (_params.preflight_light_signal_brightness == 2) {
+        } else if (brightness == 2) {
             // 2 = medium brightness, keep the 7 MSB so the maximum is 128
             shift = 1;
         } else {
