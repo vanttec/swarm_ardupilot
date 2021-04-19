@@ -23,6 +23,7 @@ void AC_DroneShowManager_Copter::_request_switch_to_show_mode()
 // Constructor.
 ModeDroneShow::ModeDroneShow(void) : Mode(),
     _stage(DroneShow_Off),
+    _last_home_position_reset_attempt_at(0),
     _last_stage_change_at(0),
     _next_status_report_due_at(0)
 {
@@ -69,6 +70,11 @@ bool ModeDroneShow::allows_arming(AP_Arming::Method method) const
 bool ModeDroneShow::cancel_requested() const
 {
     return copter.g2.drone_show_manager.cancel_requested();
+}
+
+int32_t ModeDroneShow::get_elapsed_time_since_last_home_position_reset_attempt_msec() const
+{
+    return AP_HAL::millis() - _last_home_position_reset_attempt_at;
 }
 
 // ModeDroneShow::run - runs the main drone show controller
@@ -274,6 +280,9 @@ void ModeDroneShow::initialization_run()
 void ModeDroneShow::wait_for_start_time_start()
 {
     _set_stage(DroneShow_WaitForStartTime);
+
+    // Reset home position to current location
+    try_to_update_home_position();
 }
 
 // waits for the start time of the show
@@ -282,6 +291,17 @@ void ModeDroneShow::wait_for_start_time_run()
     float time_until_takeoff_sec = copter.g2.drone_show_manager.get_time_until_takeoff_sec();
     float time_since_takeoff_sec = -time_until_takeoff_sec;
     const float latest_takeoff_attempt_after_scheduled_takeoff_time_in_seconds = 5.0f;
+
+    // Drone is in standby so keep all I terms in controllers at zero
+    attitude_control->reset_rate_controller_I_terms();
+    attitude_control->reset_yaw_target_and_rate();
+    pos_control->standby_xyz_reset();
+
+    // Keep on resetting home position to the current position to keep the AGL
+    // measurement at zero
+    if (get_elapsed_time_since_last_home_position_reset_attempt_msec() >= 30000) {
+        try_to_update_home_position();
+    }
 
     // This is copied from ModeStabilize::run() -- it is needed to allow the 
     // user to turn on the motors and spin them up while idling on the ground.
@@ -373,7 +393,10 @@ void ModeDroneShow::wait_for_start_time_run()
             if (time_until_takeoff_sec <= 8 && !_motors_started) {
                 // We attempt to start the motors 8 seconds before our takeoff time,
                 // and we keep on doing so until 5 seconds after the takeoff time, when
-                // we give up
+                // we give up.
+                //
+                // No need to set the home position once again; arming the motors
+                // will reset AGL to zero.
                 if (time_since_takeoff_sec < latest_takeoff_attempt_after_scheduled_takeoff_time_in_seconds) {
                     if (copter.g2.drone_show_manager.is_prepared_to_take_off() && start_motors_if_needed()) {
                         // Great, motors started
@@ -839,6 +862,21 @@ bool ModeDroneShow::start_motors_if_needed()
         // Prearm checks failed; prevent another attempt for the next second
         _prevent_arming_until_msec = AP_HAL::millis() + 1000;
         return false;
+    }
+}
+
+// Tries to update the home position of the drone to its current location
+void ModeDroneShow::try_to_update_home_position()
+{
+    _last_home_position_reset_attempt_at = AP_HAL::millis();
+
+    if (!is_disarmed_or_landed()) {
+        // Don't update home position if we might be flying
+        return;
+    }
+
+    if (!copter.set_home_to_current_location(/* lock = */ false)) {
+        // Ignore failures
     }
 }
 

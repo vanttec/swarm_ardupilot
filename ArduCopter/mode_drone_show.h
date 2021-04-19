@@ -63,6 +63,12 @@ private:
     // before takeoff.
     bool _motors_started;
 
+    // Stores the timestamp when we have last attempted to set the home position
+    // to the current location. Used to reset the home position every 30 seconds
+    // during the "waiting for start time" phase to keep the AGL measurement at
+    // zero.
+    uint32_t _last_home_position_reset_attempt_at;
+
     // Stores the timestamp when we have changed the execution stage the
     // last time
     uint32_t _last_stage_change_at;
@@ -86,11 +92,13 @@ private:
     void _set_stage(DroneShowModeStage value);
 
     bool cancel_requested() const;
+    int32_t get_elapsed_time_since_last_home_position_reset_attempt_msec() const;
 
     void check_changes_in_parameters();
     void notify_start_time_changed();
     bool send_guided_mode_command_during_performance();
     bool start_motors_if_needed();
+    void try_to_update_home_position();
 
     void initialization_start();
     void initialization_run();
