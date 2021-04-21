@@ -140,12 +140,19 @@ void ModeDroneShow::run()
 // Checks changes in relevant parameter values and reports them to the console
 void ModeDroneShow::check_changes_in_parameters()
 {
+    static bool last_seen_authorization;
     static uint64_t last_seen_start_time_usec;
+    bool current_authorization = copter.g2.drone_show_manager.has_authorization_to_start();
     uint64_t current_start_time_usec = copter.g2.drone_show_manager.get_start_time_usec();
 
     if (current_start_time_usec != last_seen_start_time_usec) {
         last_seen_start_time_usec = current_start_time_usec;
         notify_start_time_changed();
+    }
+
+    if (last_seen_authorization != current_authorization) {
+        last_seen_authorization = current_authorization;
+        notify_authorization_changed();
     }
 }
 
@@ -296,12 +303,6 @@ void ModeDroneShow::wait_for_start_time_run()
     attitude_control->reset_rate_controller_I_terms();
     attitude_control->reset_yaw_target_and_rate();
     pos_control->standby_xyz_reset();
-
-    // Keep on resetting home position to the current position to keep the AGL
-    // measurement at zero
-    if (get_elapsed_time_since_last_home_position_reset_attempt_msec() >= 30000) {
-        try_to_update_home_position();
-    }
 
     // This is copied from ModeStabilize::run() -- it is needed to allow the 
     // user to turn on the motors and spin them up while idling on the ground.
@@ -777,6 +778,17 @@ void ModeDroneShow::error_run()
     // Ensure that we stay disarmed even if someone tries to arm us remotely
     if (AP::arming().is_armed()) {
         AP::arming().disarm(AP_Arming::Method::SCRIPTING);
+    }
+}
+
+// Handler function that is called when the authorization state of the show has
+// changed in the drone show manager
+void ModeDroneShow::notify_authorization_changed()
+{
+    if (_stage == DroneShow_WaitForStartTime && copter.g2.drone_show_manager.has_authorization_to_start()) {
+        // Update home position and reset AGL to zero when the show is
+        // authorized and we are in the "waiting for start time" phase
+        try_to_update_home_position();
     }
 }
 

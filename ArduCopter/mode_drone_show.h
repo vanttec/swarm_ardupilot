@@ -95,6 +95,7 @@ private:
     int32_t get_elapsed_time_since_last_home_position_reset_attempt_msec() const;
 
     void check_changes_in_parameters();
+    void notify_authorization_changed();
     void notify_start_time_changed();
     bool send_guided_mode_command_during_performance();
     bool start_motors_if_needed();
