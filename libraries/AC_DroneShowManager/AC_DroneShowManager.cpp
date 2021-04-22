@@ -441,7 +441,7 @@ int32_t AC_DroneShowManager::get_elapsed_time_since_start_msec() const
     // representing one day
     if (elapsed_usec <= -86400000000) {
         return -86400000;
-    } else if (elapsed_usec >= 86400000) {
+    } else if (elapsed_usec >= 86400000000) {
         return 86400000;
     } else {
         return static_cast<int32_t>(elapsed_usec / 1000);
