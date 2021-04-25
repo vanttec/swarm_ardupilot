@@ -51,6 +51,10 @@
 // Largest valid value of show AMSL. Values smaller than this are considered invalid.
 #define LARGEST_VALID_AMSL 10000000
 
+// Default altitude to take off to when starting the show, in meters. The drone
+// will take off to this altitude above its current position.
+#define DEFAULT_TAKEOFF_ALTITUDE_METERS 2.5f
+
 // Default takeoff placement error tolerance level, in meters. The drone will not
 // take off if it is placed farther than this distance from its takeoff position.
 #define DEFAULT_XY_PLACEMENT_ERROR_METERS 3.0f
@@ -232,6 +236,15 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Increment: 0.1
     // @User: Advanced
     AP_GROUPINFO("VEL_FF_GAIN", 16, AC_DroneShowManager, _params.velocity_feedforward_gain, 1.0f),
+
+    // @Param: TAKEOFF_ALT
+    // @DisplayName: Takeoff altitude
+    // @Description: Altitude above current position to take off to when starting the show
+    // @Range: 0 5
+    // @Increment: 0.1
+    // @User: Advanced
+    // @RebootRequired: True
+    AP_GROUPINFO("TAKEOFF_ALT", 17, AC_DroneShowManager, _params.takeoff_altitude_m, DEFAULT_TAKEOFF_ALTITUDE_METERS),
 
     AP_GROUPEND
 };
@@ -1479,7 +1492,7 @@ void AC_DroneShowManager::_recalculate_trajectory_properties()
     _total_duration_sec = sb_trajectory_get_total_duration_sec(_trajectory);
 
     _takeoff_time_sec = sb_trajectory_propose_takeoff_time_sec(
-        _trajectory, AC_DroneShowManager::TAKEOFF_ALTITUDE_METERS * 1000.0f /* [mm] */,
+        _trajectory, get_takeoff_altitude_cm() * 10.0f /* [mm] */,
         AC_DroneShowManager::TAKEOFF_SPEED_METERS_PER_SEC * 1000.0f /* [mm/s] */
     );
 

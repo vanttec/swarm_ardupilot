@@ -475,7 +475,7 @@ void ModeDroneShow::takeoff_start()
     // set the current waypoint destination above the current position
     Location target_loc(current_loc);
     target_loc.set_alt_cm(
-        current_alt + AC_DroneShowManager::TAKEOFF_ALTITUDE_METERS * 100.0f,
+        current_alt + copter.g2.drone_show_manager.get_takeoff_altitude_cm(),
         Location::AltFrame::ABOVE_HOME
     );
 

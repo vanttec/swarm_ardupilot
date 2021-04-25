@@ -210,6 +210,9 @@ public:
     // Returns the current stage that the drone show mode is in
     DroneShowModeStage get_stage_in_drone_show_mode() const { return _stage_in_drone_show_mode; }
 
+    // Returns the altitude to take off to above the current position of the drone, in centimeters
+    int32_t get_takeoff_altitude_cm() const { return _params.takeoff_altitude_m * 100.0f; }
+
     // Returns the number of seconds left until show start, in microseconds
     int64_t get_time_until_start_usec() const;
 
@@ -334,10 +337,6 @@ public:
 
     static const struct AP_Param::GroupInfo var_info[];
 
-    // Takeoff altitude; the drone attempts to take off to this altitude before
-    // starting navigation
-    static constexpr float TAKEOFF_ALTITUDE_METERS = 2.5f;
-
     // Takeoff speed; the drone attempts to take off with this vertical speed
     static constexpr float TAKEOFF_SPEED_METERS_PER_SEC = 1.0f;
 
@@ -386,6 +385,9 @@ private:
 
         // Velocity feed-forward gain when velocity control is being used.
         AP_Float velocity_feedforward_gain;
+
+        // Takeoff altitude
+        AP_Float takeoff_altitude_m;
 
         struct {
             // Specifies where the a given LED light channel of the show should be sent
