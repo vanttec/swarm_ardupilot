@@ -500,6 +500,9 @@ void ModeDroneShow::takeoff_start()
     // get initial alt for WP_NAVALT_MIN
     auto_takeoff_set_start_alt();
 
+    // make sure that the yaw target is our current heading
+    attitude_control->reset_yaw_target_and_rate();
+
     // pretend that we were armed by the user by raising the throttle; the auto
     // takeoff routine won't work without this.
     copter.set_auto_armed(true);
@@ -510,6 +513,11 @@ void ModeDroneShow::takeoff_start()
 // performs the takeoff stage
 void ModeDroneShow::takeoff_run()
 {
+    // make sure that the yaw target is still our current heading. Something
+    // overwrites it in the ArduCopter code during takeoff but I could not
+    // find the culprit so far.
+    attitude_control->reset_yaw_target_and_rate();
+
     auto_takeoff_run();
 
     if (cancel_requested()) {
