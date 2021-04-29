@@ -24,8 +24,7 @@ void AC_DroneShowManager_Copter::_request_switch_to_show_mode()
 ModeDroneShow::ModeDroneShow(void) : Mode(),
     _stage(DroneShow_Off),
     _last_home_position_reset_attempt_at(0),
-    _last_stage_change_at(0),
-    _next_status_report_due_at(0)
+    _last_stage_change_at(0)
 {
 }
 
@@ -141,12 +140,12 @@ void ModeDroneShow::run()
 void ModeDroneShow::check_changes_in_parameters()
 {
     static bool last_seen_authorization;
-    static uint64_t last_seen_start_time_usec;
+    static uint64_t last_seen_start_time_unix_usec;
     bool current_authorization = copter.g2.drone_show_manager.has_authorization_to_start();
-    uint64_t current_start_time_usec = copter.g2.drone_show_manager.get_start_time_usec();
+    uint64_t current_start_time_unix_usec = copter.g2.drone_show_manager.get_start_time_unix_usec();
 
-    if (current_start_time_usec != last_seen_start_time_usec) {
-        last_seen_start_time_usec = current_start_time_usec;
+    if (current_start_time_unix_usec != last_seen_start_time_unix_usec) {
+        last_seen_start_time_unix_usec = current_start_time_unix_usec;
         notify_start_time_changed();
     }
 
@@ -241,10 +240,6 @@ void ModeDroneShow::initialization_start()
     _set_stage(DroneShow_Init);
 
     // Clear the timestamp when we last attempted to arm the drone
-    // TODO(ntamas): prevent arming from the current timestamp until the next
-    // five seconds _after_ the drone is armed to prevent injury when someone
-    // presses the safety button of the drone while a close start time is
-    // already set
     _prevent_arming_until_msec = 0;
 
     // This is copied from ModeAuto::init()
@@ -316,37 +311,6 @@ void ModeDroneShow::wait_for_start_time_run()
         motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::GROUND_IDLE);
     }
 
-    // TODO(ntamas): what if cancel_requested() is true in AC_DroneShowManager?
-    /*
-    uint32_t now = AP_HAL::millis();
-
-    if (now >= _next_status_report_due_at)
-    {
-        float elapsed = copter.g2.drone_show_manager.get_elapsed_time_since_start_sec();
-
-        if (isfinite(elapsed)) {
-            if (elapsed >= 0) {
-                gcs().send_text(
-                    MAV_SEVERITY_INFO, "Time since show start: %.2fs", elapsed
-                );
-            } else if (elapsed > -86400) {
-                gcs().send_text(
-                    MAV_SEVERITY_INFO, "Time until show start: %.2fs", -elapsed
-                );
-            }
-        }
-
-        if (time_until_takeoff_sec > 15)
-        {
-            _next_status_report_due_at = now + 5000;
-        }
-        else
-        {
-            _next_status_report_due_at = now + 1000;
-        }
-    }
-    */
-
     if (time_since_takeoff_sec > latest_takeoff_attempt_after_scheduled_takeoff_time_in_seconds + 1) {
         // We are late to the party, just move to the landed or poshold state.
         // The +1 second is needed to ensure that we show a "giving up"
@@ -374,8 +338,7 @@ void ModeDroneShow::wait_for_start_time_run()
 
             if (!_home_position_set) {
                 // Update our home to the current location so we have zero AGL
-                // TODO(ntamas): to lock or not to lock?
-                if (!copter.set_home_to_current_location(/* lock = */ false)) {
+                if (!try_to_update_home_position()) {
                     gcs().send_text(MAV_SEVERITY_CRITICAL, "Could not set home position, giving up");
                     error_start();
                 } else {
@@ -812,9 +775,6 @@ void ModeDroneShow::notify_start_time_changed()
 
     // Clear whether the motors were started
     _motors_started = false;
-
-    // Report the new start time immediately in a STATUSTEXT message
-    _next_status_report_due_at = 0;
 }
 
 // Sends a guided mode command during the show performance, calculated from the
@@ -886,18 +846,16 @@ bool ModeDroneShow::start_motors_if_needed()
 }
 
 // Tries to update the home position of the drone to its current location
-void ModeDroneShow::try_to_update_home_position()
+bool ModeDroneShow::try_to_update_home_position()
 {
     _last_home_position_reset_attempt_at = AP_HAL::millis();
 
     if (!is_disarmed_or_landed()) {
         // Don't update home position if we might be flying
-        return;
+        return false;
     }
 
-    if (!copter.set_home_to_current_location(/* lock = */ false)) {
-        // Ignore failures
-    }
+    return copter.set_home_to_current_location(/* lock = */ false);
 }
 
 // Sets the stage of the drone show module and synchronizes it with the DroneShowManager

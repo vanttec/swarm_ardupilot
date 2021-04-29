@@ -55,6 +55,9 @@
 // will take off to this altitude above its current position.
 #define DEFAULT_TAKEOFF_ALTITUDE_METERS 2.5f
 
+// Default time synchronization mode
+#define DEFAULT_SYNC_MODE TimeSyncMode_GPS
+
 // Default takeoff placement error tolerance level, in meters. The drone will not
 // take off if it is placed farther than this distance from its takeoff position.
 #define DEFAULT_XY_PLACEMENT_ERROR_METERS 3.0f
@@ -246,6 +249,14 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @RebootRequired: True
     AP_GROUPINFO("TAKEOFF_ALT", 17, AC_DroneShowManager, _params.takeoff_altitude_m, DEFAULT_TAKEOFF_ALTITUDE_METERS),
 
+    // @Param: SYNC_MODE
+    // @DisplayName: Time synchronization mode
+    // @Description: Time synchronization mode to use when starting the show
+    // @Values: 0:Countdown, 1:GPS time
+    // @User: Advanced
+    // @RebootRequired: True
+    AP_GROUPINFO("SYNC_MODE", 18, AC_DroneShowManager, _params.time_sync_mode, DEFAULT_SYNC_MODE),
+
     AP_GROUPEND
 };
 
@@ -266,8 +277,8 @@ AC_DroneShowManager::AC_DroneShowManager() :
     _trajectory_valid(false),
     _light_program_valid(false),
     _stage_in_drone_show_mode(DroneShow_Off),
-    _start_time_source(StartTimeSource::NONE),
-    _start_time_usec(0),
+    _start_time_requested_by(StartTimeSource::NONE),
+    _start_time_unix_usec(0),
     _takeoff_time_sec(0),
     _landing_time_sec(0),
     _total_duration_sec(0),
@@ -417,20 +428,25 @@ void AC_DroneShowManager::get_desired_velocity_neu_in_cms_per_seconds_at_seconds
 // returns the elapsed time since the start of the show, in microseconds
 int64_t AC_DroneShowManager::get_elapsed_time_since_start_usec() const
 {
-    if (_start_time_usec > 0) {
-        // AP::gps().time_epoch_usec() is smart enough to handle the case when
-        // the GPS fix was lost so no need to worry about loss of GPS fix here.
-        uint64_t now = AP::gps().time_epoch_usec();
-        uint64_t diff;
-        if (_start_time_usec > now) {
-            diff = _start_time_usec - now;
+    uint64_t now, reference, diff;
+    
+    // AP::gps().time_epoch_usec() is smart enough to handle the case when
+    // the GPS fix was lost so no need to worry about loss of GPS fix here.
+    now = AP::gps().time_epoch_usec();
+    reference = _start_time_unix_usec;
+
+    // TODO(ntamas): handle the case of TimeSyncMode_Countdown here!!
+
+    if (reference > 0) {
+        if (reference > now) {
+            diff = reference - now;
             if (diff < INT64_MAX) {
                 return -diff;
             } else {
                 return INT64_MIN;
             }
-        } else if (_start_time_usec < now) {
-            diff = now - _start_time_usec;
+        } else if (reference < now) {
+            diff = now - reference;
             if (diff < INT64_MAX) {
                 return diff;
             } else {
@@ -834,15 +850,25 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
 
 void AC_DroneShowManager::handle_rc_start_switch()
 {
-    if (_stage_in_drone_show_mode == DroneShow_WaitForStartTime)
+    if (_stage_in_drone_show_mode != DroneShow_WaitForStartTime)
     {
-        if (!_rc_start_switch_blocked_until || _rc_start_switch_blocked_until < AP_HAL::millis())
-        {
-            start_if_not_running();
+        // We are not in the "wait for start time" phase so we ignore the
+        // switch
+        return;
+    }
 
-            if (_start_time_source == StartTimeSource::START_METHOD) {
-                _start_time_source = StartTimeSource::RC_SWITCH;
-            }
+    if (_rc_start_switch_blocked_until && _rc_start_switch_blocked_until >= AP_HAL::millis())
+    {
+        // The switch is ignored at the moment
+        return;
+    }
+
+    if (start_if_not_running()) {
+        // Rewrite the start time source to be "RC switch", not
+        // "start method", even though we implemented it using
+        // the start_if_not_running() method
+        if (_start_time_requested_by == StartTimeSource::START_METHOD) {
+            _start_time_requested_by = StartTimeSource::RC_SWITCH;
         }
     }
 }
@@ -857,17 +883,26 @@ bool AC_DroneShowManager::should_switch_to_show_mode_when_authorized() const
     return _params.show_mode_settings & 2;
 }
 
-void AC_DroneShowManager::start_if_not_running()
+bool AC_DroneShowManager::start_if_not_running()
 {
+    bool success = false;
+
     _cancel_requested = false;
 
-    if (_is_gps_time_ok()) {
-        // We are modifying a parameter directly here without notifying the
-        // param subsystem, but this is okay -- we do not want to save the
-        // start time into the EEPROM, and it is reset at the next boot anyway.
-        _params.start_time_gps_sec = (AP::gps().time_week_ms() / 1000 + 10) % GPS_WEEK_LENGTH_SEC;
-        _start_time_source = StartTimeSource::START_METHOD;
+    if (uses_gps_time_for_show_start()) {
+        if (_is_gps_time_ok()) {
+            // We are modifying a parameter directly here without notifying the
+            // param subsystem, but this is okay -- we do not want to save the
+            // start time into the EEPROM, and it is reset at the next boot anyway.
+            _params.start_time_gps_sec = (AP::gps().time_week_ms() / 1000 + 10) % GPS_WEEK_LENGTH_SEC;
+            _start_time_requested_by = StartTimeSource::START_METHOD;
+            success = true;
+        }
+    } else {
+        // TODO(ntamas): handle countdown-based time sync method here!
     }
+
+    return success;
 }
 
 void AC_DroneShowManager::stop_if_running()
@@ -919,8 +954,12 @@ void AC_DroneShowManager::_check_changes_in_parameters()
 
     if (new_start_time_pending) {
         // We don't allow the user to mess around with the start time if we are
-        // already performing the show
-        if (!is_safe_to_change_start_time_in_stage(_stage_in_drone_show_mode)) {
+        // already performing the show, or if the show is supposed to be started
+        // with a countdown
+        if (
+            !is_safe_to_change_start_time_in_stage(_stage_in_drone_show_mode) ||
+            !uses_gps_time_for_show_start()
+        ) {
             new_start_time_pending = false;
         }
     }
@@ -933,35 +972,24 @@ void AC_DroneShowManager::_check_changes_in_parameters()
             if (AP::gps().time_week_ms() < start_time_gps_msec) {
                 // Interpret the given timestamp in the current GPS week as it is in
                 // the future even with the same GPS week number
-                _start_time_usec = AP::gps().time_epoch_convert(
+                _start_time_unix_usec = AP::gps().time_epoch_convert(
                     AP::gps().time_week(), start_time_gps_msec
                 ) * 1000ULL;
             } else {
                 // Interpret the given timestamp in the next GPS week as it is in
                 // the past with the same GPS week number
-                _start_time_usec = AP::gps().time_epoch_convert(
+                _start_time_unix_usec = AP::gps().time_epoch_convert(
                     AP::gps().time_week() + 1, start_time_gps_msec
                 ) * 1000ULL;
             }
 
-            if (_start_time_source == StartTimeSource::NONE) {
-                _start_time_source = StartTimeSource::PARAMETER;
+            if (_start_time_requested_by == StartTimeSource::NONE) {
+                _start_time_requested_by = StartTimeSource::PARAMETER;
             }
         } else {
-            _start_time_usec = 0;
-            _start_time_source = StartTimeSource::NONE;
+            _start_time_unix_usec = 0;
+            _start_time_requested_by = StartTimeSource::NONE;
         }
-
-        /*
-        if (has_scheduled_start_time()) {
-            gcs().send_text(
-                MAV_SEVERITY_INFO, "Start time set to %llu",
-                static_cast<unsigned long long int>(_start_time_usec)
-            );
-        } else {
-            gcs().send_text(MAV_SEVERITY_INFO, "Start time cleared");
-        }
-        */
     }
 
     if (new_show_authorization_pending) {
@@ -1020,12 +1048,13 @@ void AC_DroneShowManager::_clear_start_time_after_landing()
 
 void AC_DroneShowManager::_clear_start_time_if_set_by_switch()
 {
-    if (_start_time_source == StartTimeSource::RC_SWITCH) {
+    if (_start_time_requested_by == StartTimeSource::RC_SWITCH) {
         _params.start_time_gps_sec = -1;
-        _start_time_source = StartTimeSource::NONE;
-        _start_time_usec = 0;
+        _start_time_requested_by = StartTimeSource::NONE;
+        _start_time_unix_usec = 0;
+        // TODO(ntamas): handle the case of TimeSyncMode_Countdown here!!
     }
-}
+ }
 
 bool AC_DroneShowManager::_copy_show_coordinate_system_from_parameters_to(
     ShowCoordinateSystem& _coordinate_system

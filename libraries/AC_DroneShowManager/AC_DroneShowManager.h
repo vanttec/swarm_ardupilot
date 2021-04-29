@@ -80,6 +80,12 @@ enum LightEffectPriority {
     LightEffectPriority_Internal = 3 // internal light signals, e.g. compass calibration light signal
 };
 
+// Time synchronization mode used when starting the show
+enum TimeSyncMode {
+    TimeSyncMode_Countdown = 0, // Ignore SHOW_START_TIME and expect countdown messages from GCS
+    TimeSyncMode_GPS = 1 // Use SHOW_START_TIME and synchronize based on GPS time
+};
+
 /// @class  AC_DroneShowManager
 /// @brief  Class managing the trajectory and light program of a drone show
 class AC_DroneShowManager {
@@ -188,7 +194,7 @@ public:
     float get_relative_takeoff_time_sec() const { return _takeoff_time_sec; }
 
     // Returns the start time in microseconds as a UNIX timestamp, as set by the user.
-    uint64_t get_start_time_usec() const { return _start_time_usec; }
+    uint64_t get_start_time_unix_usec() const { return _start_time_unix_usec; }
 
     // Returns the total duration of the loaded trajectory, in seconds
     float get_total_duration_sec() const { return _total_duration_sec; }
@@ -256,7 +262,8 @@ public:
 
     // Returns whether a scheduled start time was determined or set by the user for the show
     bool has_scheduled_start_time() const {
-        return _start_time_usec > 0;
+        // TODO(ntamas): handle case of TimeSyncMode_Countdown here!
+        return _start_time_unix_usec > 0;
     }
 
     // Returns whether a valid takeoff time was determined for the show
@@ -323,8 +330,9 @@ public:
     bool should_switch_to_show_mode_when_authorized() const;
 
     // Asks the drone show manager to schedule a start as soon as possible if
-    // the show is not running yet
-    void start_if_not_running();
+    // the show is not running yet. Returns whether the start time was scheduled
+    // successfully.
+    bool start_if_not_running();
 
     // Asks the drone show manager to cancel the show as soon as possible if
     // the show is running yet
@@ -334,6 +342,9 @@ public:
     // tasks that have to be performed regularly (such as checking for changes
     // in parameter values).
     void update();
+
+    // Returns whether the manager uses GPS time to start the show
+    bool uses_gps_time_for_show_start() const { return _params.time_sync_mode == TimeSyncMode_GPS; }
 
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -347,7 +358,8 @@ public:
 private:
     // Structure holding all the parameters settable by the user
     struct {
-        // Start time in GPS time of week (seconds), as set by the user in a parameter
+        // Start time in GPS time of week (seconds), as set by the user in a parameter.
+        // Used only when time_sync_mode == TimeSyncMode_GPS
         AP_Int32 start_time_gps_sec;
 
         // Latitude of drone show coordinate system, in 1e-7 degrees, as set in the parameters by the user
@@ -388,6 +400,9 @@ private:
 
         // Takeoff altitude
         AP_Float takeoff_altitude_m;
+
+        // Time synchronization mode
+        AP_Int8 time_sync_mode;
 
         struct {
             // Specifies where the a given LED light channel of the show should be sent
@@ -436,10 +451,13 @@ private:
 
     // Reason why the start time was set to the current value; used to decide whether
     // it should be cleared when the drone show mode is restarted
-    StartTimeSource _start_time_source;
+    StartTimeSource _start_time_requested_by;
 
     // Start time of the show, in microseconds, as a UNIX timestamp, zero if unset.
-    uint64_t _start_time_usec;
+    // This variable is used if the start time is synchronized to GPS time or
+    // some other absolute (external) time source that is guaranteed to be
+    // synchronized across drones.
+    uint64_t _start_time_unix_usec;
 
     // Takeoff position, in local coordinates, relative to the show coordinate system.
     // Zero if no show data is loaded. Units are in millimeters.

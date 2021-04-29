@@ -73,10 +73,6 @@ private:
     // last time
     uint32_t _last_stage_change_at;
 
-    // Stores when we are supposed to print the next status report as a STATUSTEXT
-    // message
-    uint64_t _next_status_report_due_at;
-
     // Stores whether we have set the home position to the takeoff position
     // before takeoff.
     bool _home_position_set;
@@ -99,7 +95,7 @@ private:
     void notify_start_time_changed();
     bool send_guided_mode_command_during_performance();
     bool start_motors_if_needed();
-    void try_to_update_home_position();
+    bool try_to_update_home_position();
 
     void initialization_start();
     void initialization_run();
