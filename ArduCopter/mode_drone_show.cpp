@@ -140,12 +140,12 @@ void ModeDroneShow::run()
 void ModeDroneShow::check_changes_in_parameters()
 {
     static bool last_seen_authorization;
-    static uint64_t last_seen_start_time_unix_usec;
+    static uint64_t last_seen_start_time;
     bool current_authorization = copter.g2.drone_show_manager.has_authorization_to_start();
-    uint64_t current_start_time_unix_usec = copter.g2.drone_show_manager.get_start_time_unix_usec();
+    uint64_t current_start_time = copter.g2.drone_show_manager.get_start_time_epoch_undefined();
 
-    if (current_start_time_unix_usec != last_seen_start_time_unix_usec) {
-        last_seen_start_time_unix_usec = current_start_time_unix_usec;
+    if (current_start_time != last_seen_start_time) {
+        last_seen_start_time = current_start_time;
         notify_start_time_changed();
     }
 

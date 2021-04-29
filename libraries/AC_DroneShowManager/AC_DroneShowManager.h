@@ -134,7 +134,7 @@ public:
     enum StartTimeSource {
         NONE = 0,         // No start time was set
         PARAMETER = 1,    // start time was set by the user via the START_TIME parameter
-        START_METHOD = 2, // start time was set by calling the start_if_not_running() method
+        START_METHOD = 2, // start time was set by calling the schedule_delayed_start() method
         RC_SWITCH = 3     // start time was set via the RC switch action
     };
 
@@ -150,6 +150,14 @@ public:
     // show as soon as possible. This flag is checked regularly from
     // mode_drone_show.cpp
     bool cancel_requested() const { return _cancel_requested; }
+
+    // Clears the scheduled start time of the show (but does not cancel the
+    // show if it is already running). Returns whether the request was
+    // processed.
+    //
+    // This function is a no-op if the drone show is not in the "waiting for
+    // start time" phase and 'force' is set to false.
+    bool clear_scheduled_start_time(bool force = false);
 
     // Configures the show origin, orientation and AMSL reference in a single
     // call. This function sets the corresponding SHOW_ parameters as if they
@@ -193,8 +201,17 @@ public:
     // Returns the takeoff time relative to the start of the show
     float get_relative_takeoff_time_sec() const { return _takeoff_time_sec; }
 
-    // Returns the start time in microseconds as a UNIX timestamp, as set by the user.
-    uint64_t get_start_time_unix_usec() const { return _start_time_unix_usec; }
+    // Returns the start time in microseconds. Depending on the value of the
+    // SHOW_SYNC_MODE parameter, this might be an internal timestamp or a
+    // UNIX timestamp. Do _not_ use this method for anything else than
+    // determining whether the start time was changed.
+    uint64_t get_start_time_epoch_undefined() const {
+        return (
+            _params.time_sync_mode == TimeSyncMode_Countdown
+            ? _start_time_on_internal_clock_usec
+            : _start_time_unix_usec
+        );
+    }
 
     // Returns the total duration of the loaded trajectory, in seconds
     float get_total_duration_sec() const { return _total_duration_sec; }
@@ -207,11 +224,6 @@ public:
 
     // Returns the number of seconds elapsed since show start, in seconds
     float get_elapsed_time_since_start_sec() const;
-
-    // Returns a timestamp meant to be used solely for the purposes of implementing
-    // light signals. The timestamp is synced to GPS seconds when the drone has
-    // a good GPS fix.
-    uint32_t _get_gps_synced_timestamp_in_millis_for_lights() const;
 
     // Returns the current stage that the drone show mode is in
     DroneShowModeStage get_stage_in_drone_show_mode() const { return _stage_in_drone_show_mode; }
@@ -260,10 +272,18 @@ public:
     // Returns whether the show orientation was set explicitly by the user
     bool has_explicit_show_orientation_set_by_user() const;
 
-    // Returns whether a scheduled start time was determined or set by the user for the show
+    // Returns whether a scheduled start time was determined or set by the user
+    // for the show. When using GPS for time synchronization, this flag is true
+    // if the user has set a start time in the SHOW_START_TIME parameter. When
+    // using the internal clock and a countdown packet for time synchronization,
+    // this flag is true if at least one countdown packet was received and no
+    // countdown cancellation packet was received.
     bool has_scheduled_start_time() const {
-        // TODO(ntamas): handle case of TimeSyncMode_Countdown here!
-        return _start_time_unix_usec > 0;
+        return (
+            uses_gps_time_for_show_start()
+            ? _start_time_unix_usec > 0
+            : _start_time_on_internal_clock_usec > 0
+        );
     }
 
     // Returns whether a valid takeoff time was determined for the show
@@ -319,6 +339,16 @@ public:
     // there was an IO error.
     bool reload_show_from_storage() WARN_IF_UNUSED;
 
+    // Asks the drone show manager to schedule a start as soon as possible if
+    // the show is not running yet. The delay parameter specifies the number of
+    // milliseconds until the show start. It is the responsibility of the caller
+    // to ensure that the drone has enough time to prepare after receiving the
+    // request. Returns whether the start time was scheduled successfully.
+    //
+    // This function is a no-op if the drone show is not in the "waiting for
+    // start time" phase.
+    bool schedule_delayed_start(uint32_t delay_ms);
+
     // Sends a drone show status message (wrapped in a DATA16 packet) on the given MAVLink channel
     void send_drone_show_status(const mavlink_channel_t chan) const;
 
@@ -328,11 +358,6 @@ public:
 
     // Returns whether the drone should switch to show mode when authorized to start
     bool should_switch_to_show_mode_when_authorized() const;
-
-    // Asks the drone show manager to schedule a start as soon as possible if
-    // the show is not running yet. Returns whether the start time was scheduled
-    // successfully.
-    bool start_if_not_running();
 
     // Asks the drone show manager to cancel the show as soon as possible if
     // the show is running yet
@@ -453,8 +478,13 @@ private:
     // it should be cleared when the drone show mode is restarted
     StartTimeSource _start_time_requested_by;
 
+    // Start time of the show, in microseconds, according to the internal clock
+    // of the drone, zero if unset. This variable is used _only_ if the time
+    // synchronisation mode is set to use a countdown-based method.
+    uint64_t _start_time_on_internal_clock_usec;
+
     // Start time of the show, in microseconds, as a UNIX timestamp, zero if unset.
-    // This variable is used if the start time is synchronized to GPS time or
+    // This variable is used _only_ if the start time is synchronized to GPS time or
     // some other absolute (external) time source that is guaranteed to be
     // synchronized across drones.
     uint64_t _start_time_unix_usec;
@@ -554,6 +584,11 @@ private:
 
     // Retrieves the current location of the vehicle from the EKF
     virtual bool _get_current_location(Location& loc) const { return false; }
+
+    // Returns a timestamp meant to be used solely for the purposes of implementing
+    // light signals. The timestamp is synced to GPS seconds when the drone has
+    // a good GPS fix.
+    uint32_t _get_gps_synced_timestamp_in_millis_for_lights() const;
 
     // Handles a generic MAVLink DATA* message from the ground station.
     bool _handle_custom_data_message(uint8_t type, void* data, uint8_t length);

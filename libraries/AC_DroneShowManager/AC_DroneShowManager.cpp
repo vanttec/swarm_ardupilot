@@ -45,6 +45,9 @@
 // Length of a GPS week in seconds
 #define GPS_WEEK_LENGTH_SEC 604800
 
+// Length of a GPS week in milliseconds
+#define GPS_WEEK_LENGTH_MSEC 604800000
+
 // Smallest valid value of show AMSL. Values smaller than this are considered unset.
 #define SMALLEST_VALID_AMSL -9999999
 
@@ -104,6 +107,12 @@ namespace CustomPackets {
         // cleared.
         int32_t start_time;
         uint8_t is_authorized;
+
+        struct PACKED {
+            // Countdown, i.e. number of milliseconds until the start of the show.
+            // Positive number means that there is still some time left.
+            int32_t countdown_msec;
+        } optional_part;
     } start_config_t;
 };
 
@@ -278,6 +287,7 @@ AC_DroneShowManager::AC_DroneShowManager() :
     _light_program_valid(false),
     _stage_in_drone_show_mode(DroneShow_Off),
     _start_time_requested_by(StartTimeSource::NONE),
+    _start_time_on_internal_clock_usec(0),
     _start_time_unix_usec(0),
     _takeoff_time_sec(0),
     _landing_time_sec(0),
@@ -362,6 +372,23 @@ void AC_DroneShowManager::init()
     _update_rgb_led_instance();
 }
 
+
+bool AC_DroneShowManager::clear_scheduled_start_time(bool force)
+{
+    if (!force && _stage_in_drone_show_mode != DroneShow_WaitForStartTime)
+    {
+        // We are not in the "wait for start time" phase so we ignore the request
+        return false;
+    }
+
+    _params.start_time_gps_sec = -1;
+    _start_time_on_internal_clock_usec = 0;
+    _start_time_requested_by = StartTimeSource::NONE;
+    _start_time_unix_usec = 0;
+
+    return true;
+}
+
 bool AC_DroneShowManager::configure_show_coordinate_system(
     int32_t lat, int32_t lng, int32_t amsl_mm, float orientation_deg
 ) {
@@ -432,10 +459,13 @@ int64_t AC_DroneShowManager::get_elapsed_time_since_start_usec() const
     
     // AP::gps().time_epoch_usec() is smart enough to handle the case when
     // the GPS fix was lost so no need to worry about loss of GPS fix here.
-    now = AP::gps().time_epoch_usec();
-    reference = _start_time_unix_usec;
-
-    // TODO(ntamas): handle the case of TimeSyncMode_Countdown here!!
+    if (uses_gps_time_for_show_start()) {
+        now = AP::gps().time_epoch_usec();
+        reference = _start_time_unix_usec;
+    } else {
+        now = AP_HAL::micros64();
+        reference = _start_time_on_internal_clock_usec;
+    }
 
     if (reference > 0) {
         if (reference > now) {
@@ -806,7 +836,7 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
     if (has_authorization_to_start()) {
         flags |= (1 << 2);
     }
-    if (!_is_gps_time_ok()) {
+    if (uses_gps_time_for_show_start() && !_is_gps_time_ok()) {
         flags |= (1 << 1);
     }
 
@@ -831,7 +861,10 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
         encoded_elapsed_time = static_cast<int16_t>(elapsed_time);
     }
 
-    /* fill the packet */
+    /* fill the packet. Note that in the first four bytes we _always_ put the
+     * start time according to GPS timestamps, even if we are using the
+     * internal clock to synchronize the start. This is to make sure that the
+     * UI on Skybrush Live shows the GPS timestamp set by the user */
     *(( int32_t*) (packet + 0)) = _params.start_time_gps_sec;
     *((uint16_t*) (packet + 4)) = sb_rgb_color_encode_rgb565(_last_rgb_led_color);
     packet[6] = flags;
@@ -850,23 +883,16 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
 
 void AC_DroneShowManager::handle_rc_start_switch()
 {
-    if (_stage_in_drone_show_mode != DroneShow_WaitForStartTime)
-    {
-        // We are not in the "wait for start time" phase so we ignore the
-        // switch
-        return;
-    }
-
     if (_rc_start_switch_blocked_until && _rc_start_switch_blocked_until >= AP_HAL::millis())
     {
         // The switch is ignored at the moment
         return;
     }
 
-    if (start_if_not_running()) {
+    if (schedule_delayed_start(10000 /* msec */)) {
         // Rewrite the start time source to be "RC switch", not
         // "start method", even though we implemented it using
-        // the start_if_not_running() method
+        // the schedule_delayed_start() method
         if (_start_time_requested_by == StartTimeSource::START_METHOD) {
             _start_time_requested_by = StartTimeSource::RC_SWITCH;
         }
@@ -883,23 +909,34 @@ bool AC_DroneShowManager::should_switch_to_show_mode_when_authorized() const
     return _params.show_mode_settings & 2;
 }
 
-bool AC_DroneShowManager::start_if_not_running()
+bool AC_DroneShowManager::schedule_delayed_start(uint32_t delay_ms)
 {
     bool success = false;
 
     _cancel_requested = false;
+
+    if (_stage_in_drone_show_mode != DroneShow_WaitForStartTime)
+    {
+        // We are not in the "wait for start time" phase so we ignore the request
+        return false;
+    }
 
     if (uses_gps_time_for_show_start()) {
         if (_is_gps_time_ok()) {
             // We are modifying a parameter directly here without notifying the
             // param subsystem, but this is okay -- we do not want to save the
             // start time into the EEPROM, and it is reset at the next boot anyway.
-            _params.start_time_gps_sec = (AP::gps().time_week_ms() / 1000 + 10) % GPS_WEEK_LENGTH_SEC;
-            _start_time_requested_by = StartTimeSource::START_METHOD;
+            // Delay is rounded down to integer seconds.
+            _params.start_time_gps_sec = ((AP::gps().time_week_ms() + delay_ms) / 1000) % GPS_WEEK_LENGTH_SEC;
             success = true;
         }
     } else {
-        // TODO(ntamas): handle countdown-based time sync method here!
+        _start_time_on_internal_clock_usec = AP_HAL::micros64() + (delay_ms * 1000);
+        success = true;
+    }
+
+    if (success) {
+        _start_time_requested_by = StartTimeSource::START_METHOD;
     }
 
     return success;
@@ -1043,16 +1080,14 @@ void AC_DroneShowManager::_check_radio_failsafe()
 void AC_DroneShowManager::_clear_start_time_after_landing()
 {
     _params.start_time_gps_sec = -1;
+    _start_time_on_internal_clock_usec = 0;
     _check_changes_in_parameters();
 }
 
 void AC_DroneShowManager::_clear_start_time_if_set_by_switch()
 {
     if (_start_time_requested_by == StartTimeSource::RC_SWITCH) {
-        _params.start_time_gps_sec = -1;
-        _start_time_requested_by = StartTimeSource::NONE;
-        _start_time_unix_usec = 0;
-        // TODO(ntamas): handle the case of TimeSyncMode_Countdown here!!
+        clear_scheduled_start_time(/* force = */ true);
     }
  }
 
@@ -1135,14 +1170,33 @@ bool AC_DroneShowManager::_handle_custom_data_message(uint8_t type, void* data, 
     switch (type) {
         // Broadcast start time and authorization state of the show
         case CustomPackets::START_CONFIG:
-            if (length >= sizeof(CustomPackets::start_config_t)) {
+            if (length >= offsetof(CustomPackets::start_config_t, optional_part)) {
                 CustomPackets::start_config_t* start_config = static_cast<CustomPackets::start_config_t*>(data);
+
+                // Update start time expressed in GPS time of week
                 if (start_config->start_time < 0) {
                     _params.start_time_gps_sec = -1;
                 } else if (start_config->start_time < GPS_WEEK_LENGTH_SEC) {
                     _params.start_time_gps_sec = start_config->start_time;
                 }
+
+                // Update authorization flag
                 _params.authorized_to_start = start_config->is_authorized;
+
+                // Optional second part is used by the GCS to convey how many
+                // milliseconds there are until the start of the show. If this
+                // part exists and is positive, _and_ we are using the internal
+                // clock to synchronize the start, then we update the start
+                // time based on this
+                if (length >= sizeof(CustomPackets::start_config_t) && !uses_gps_time_for_show_start()) {
+                    int32_t countdown_msec = start_config->optional_part.countdown_msec;
+
+                    if (countdown_msec < -GPS_WEEK_LENGTH_MSEC) {
+                        clear_scheduled_start_time();
+                    } else if (countdown_msec >= 0 && countdown_msec < GPS_WEEK_LENGTH_MSEC) {
+                        schedule_delayed_start(countdown_msec);
+                    }
+                }
 
                 return true;
             }
