@@ -4,6 +4,8 @@
 
 #include "DroneShowLED_MAVLink.h"
 
+static const char message_name[10] = "rgb";
+
 DroneShowLED_MAVLink::DroneShowLED_MAVLink(uint8_t instance) : DroneShowLED(),
     _instance(instance),
     _chan(MAVLINK_COMM_0),
@@ -43,7 +45,7 @@ bool DroneShowLED_MAVLink::try_set_rgb(uint8_t red, uint8_t green, uint8_t blue)
     if (valid_channel(chan) && mavlink_comm_port[chan] != 0) {
         CHECK_PAYLOAD_SIZE2(DEBUG_VECT);
         mavlink_msg_debug_vect_send(
-            _chan, "rgb", AP_HAL::millis(),
+            _chan, message_name, AP_HAL::millis(),
             red / 255.0f, green / 255.0f, blue / 255.0f
         );
     }
