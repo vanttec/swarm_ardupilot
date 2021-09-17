@@ -18,12 +18,19 @@ public:
     CollMotFlockCtrl(const CollMotFlockCtrl &other) = delete;
     CollMotFlockCtrl &operator=(const CollMotFlockCtrl&) = delete;
 
+    // Returns whether we allow continuing a mission in guided mode if there
+    // is no RC and no GCS connection
+    bool allowContinueInGuidedModeWithoutGCSAndRC() {
+        return isOptionSet(Options::AllowGuidedContinueWithoutGCSAndRC);
+    }
+
 private:
 
     // Enum specifying the meaning of individual bits in the CM_FLOCK_OPTS
     // parameter
     enum class Options : int32_t {
-        All = (1 << 0U)
+        All = (1 << 0U),
+        AllowGuidedContinueWithoutGCSAndRC = (1 << 1U),
     };
 
     // Placeholder for the value of the CM_FLOCK_OPTS parameter

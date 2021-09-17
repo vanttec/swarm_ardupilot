@@ -60,8 +60,9 @@ void Copter::failsafe_radio_on_event()
         desired_action = Failsafe_Action_None;
 
     } else if ((flightmode->in_guided_mode()) &&
-      (failsafe_option(FailsafeOption::RC_CONTINUE_IF_GUIDED)) && (g.failsafe_gcs != FS_GCS_DISABLED)) {
+      (failsafe_option(FailsafeOption::RC_CONTINUE_IF_GUIDED)) && (g.failsafe_gcs != FS_GCS_DISABLED || collmot.allowContinueInGuidedModeWithoutGCSAndRC())) {
         // Allow guided mode to continue when FS_OPTIONS is set to continue in guided mode.  Only if the GCS failsafe is enabled.
+        // or if the CollMot-specific "allow continuing in guided mode even without GCS and RC" flag is set
         gcs().send_text(MAV_SEVERITY_WARNING, "Radio Failsafe - Continuing Guided Mode");
         desired_action = Failsafe_Action_None;
 
