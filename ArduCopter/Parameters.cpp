@@ -743,6 +743,12 @@ const AP_Param::Info Copter::var_info[] = {
     GOBJECT(osd, "OSD", AP_OSD),
 #endif
 
+    // @Group: CM_
+    // @Path: collmot_flockctrl.cpp
+#if COLLMOT_EXTENSIONS_ENABLED == ENABLED
+    GOBJECT(collmot, "CM_", CollMotFlockCtrl),
+#endif
+
     // @Group:
     // @Path: Parameters.cpp
     GOBJECT(g2, "",  ParametersG2),

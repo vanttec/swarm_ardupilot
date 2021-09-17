@@ -173,6 +173,10 @@
 #include "mode_drone_show.h"
 #endif
 
+#if COLLMOT_EXTENSIONS_ENABLED == ENABLED
+#include "collmot_flockctrl.h"
+#endif
+
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #include <SITL/SITL.h>
 #endif
@@ -545,6 +549,11 @@ private:
 
     // avoidance of adsb enabled vehicles (normally manned vehicles)
     AP_Avoidance_Copter avoidance_adsb{adsb};
+#endif
+
+#if COLLMOT_EXTENSIONS_ENABLED == ENABLED
+    // CollMot-specific modifications
+    CollMotFlockCtrl collmot;
 #endif
 
     // last valid RC input time

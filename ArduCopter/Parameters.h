@@ -223,6 +223,8 @@ public:
         k_param_gcs5,
         k_param_gcs6,
 
+        k_param_collmot = 134,   // hopefully this won't clash with upstream for a while
+
         //
         // 135 : reserved for Solo until features merged with master
         //
