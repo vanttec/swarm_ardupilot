@@ -1,3 +1,6 @@
+// Configuration
+#include <AP_ADSB/AP_ADSB.h>
+#include "defines.h"
 #include "config.h"
 
 #include "collmot_flockctrl.h"

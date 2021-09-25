@@ -26,7 +26,7 @@ cd "`dirname $0`"
 mkdir -p dist/
 
 if [ ! -d .venv ]; then
-    python2.7 -m venv .venv
+    python3 -m venv .venv
     .venv/bin/pip install -U pip wheel
     .venv/bin/pip install future empy
 fi

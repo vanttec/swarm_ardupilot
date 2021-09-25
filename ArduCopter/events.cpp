@@ -73,7 +73,7 @@ false
         desired_action = Failsafe_Action_None;
 
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
-    } else if (control_mode == Mode::Number::DRONE_SHOW && failsafe_option(FailsafeOption::RC_CONTINUE_IF_GUIDED)) {
+    } else if (flightmode->mode_number() == Mode::Number::DRONE_SHOW && failsafe_option(FailsafeOption::RC_CONTINUE_IF_GUIDED)) {
         // Allow drone show mode to continue when FS_OPTIONS is set to continue in guided mode
         gcs().send_text(MAV_SEVERITY_WARNING, "Radio Failsafe - Continuing Show");
         desired_action = Failsafe_Action_None;
