@@ -1772,11 +1772,25 @@ void AC_DroneShowManager::_update_lights()
         AP_Notify::flags.ekf_bad || AP_Notify::flags.failsafe_battery ||
         AP_Notify::flags.failsafe_gcs || AP_Notify::flags.failsafe_radio
     ) {
-        // In error conditions, the light should be red.
-        //
         // Ideally, the condition above should be the same as the one that triggers
-        // MAV_STATE_CRITICAL in GCS_Mavlink.cpp. However, we cannot reach out to
-        // the Copter class because everything that we would need there is private.
+        // MAV_STATE_CRITICAL in GCS_Mavlink.cpp. The conditions for this flag
+        // are encoded in Copter::any_failsafe_triggered(). However, we need
+        // some tweaks so we list the conditions above explicitly, with the
+        // following considerations:
+        // 
+        // * In case of EKF failure or battery failsafe conditions, the light
+        //   should be red.
+        //
+        // * We do not trigger the red light for radio or GCS failsafes because
+        //   both are quite common during a show when the drone is far from the
+        //   GCS and/or the pilot, but these usually do not represent a problem.
+        //
+        // * We do not trigger the red light for ADSB or terrain failsafes
+        //   either; we do not use terrain following during a show and we do
+        //   not use ADSB either at the moment.
+        //
+        // The conditions above and Copter::any_failsafe_triggered() should be
+        // reviewed regularly to see if these are still applicable.
         color = Colors::RED;
         pattern = BLINK;
     } else if (AP_Notify::flags.flying) {
