@@ -21,4 +21,4 @@
 	url = git://github.com/ArduPilot/libcanard.git
 [submodule "modules/libskybrush"]
 	path = modules/libskybrush
-	url = git@git.collmot.com:collmot/libskybrush.git
+	url = git@git.collmot.com:skybrush/libskybrush.git
