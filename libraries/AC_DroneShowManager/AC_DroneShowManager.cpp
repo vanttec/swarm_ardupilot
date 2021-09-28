@@ -123,6 +123,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Range: -1 604799
     // @Increment: 1
     // @Units: sec
+    // @Volatile: True
     // @User: Standard
     //
     // Note that we cannot use UNIX timestamps here because ArduPilot stores
@@ -171,6 +172,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Description: Whether the drone is authorized to start
     // @Range: 0 1
     // @Increment: 1
+    // @Volatile: True
     // @User: Standard
     AP_GROUPINFO("START_AUTH", 5, AC_DroneShowManager, _params.authorized_to_start, 0),
 
