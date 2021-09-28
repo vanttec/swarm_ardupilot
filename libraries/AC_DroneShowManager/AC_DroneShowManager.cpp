@@ -132,7 +132,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     AP_GROUPINFO("START_TIME", 1, AC_DroneShowManager, _params.start_time_gps_sec, -1),
 
     // @Param: ORIGIN_LAT
-    // @DisplayName: Origin (latitude)
+    // @DisplayName: Show origin (latitude)
     // @Description: Latitude of the origin of the drone show coordinate system, zero if unset
     // @Range: -900000000 900000000
     // @Increment: 1
@@ -141,7 +141,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     AP_GROUPINFO("ORIGIN_LAT", 2, AC_DroneShowManager, _params.origin_lat, 0),
 
     // @Param: ORIGIN_LNG
-    // @DisplayName: Origin (longitude)
+    // @DisplayName: Show origin (longitude)
     // @Description: Longitude of the origin of the drone show coordinate system, zero if unset
     // @Range: -1800000000 1800000000
     // @Increment: 1
@@ -150,8 +150,8 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     AP_GROUPINFO("ORIGIN_LNG", 3, AC_DroneShowManager, _params.origin_lng, 0),
 
     // @Param: ORIGIN_AMSL
-    // @DisplayName: Origin (altitude)
-    // @Description: Altitude of the origin of the drone show coordinate system, -10000000 or smaller if unset
+    // @DisplayName: Show origin (altitude)
+    // @Description: AMSL altitude of the origin of the drone show coordinate system, -10000000 or smaller if unset
     // @Range: -10000000 10000000
     // @Increment: 1
     // @Units: mm
@@ -159,8 +159,8 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     AP_GROUPINFO("ORIGIN_AMSL", 12, AC_DroneShowManager, _params.origin_amsl_mm, SMALLEST_VALID_AMSL - 1),
 
     // @Param: ORIENTATION
-    // @DisplayName: Orientation
-    // @Description: Orientation of the X axis of the show coordinate system, -1 if unset
+    // @DisplayName: Show orientation
+    // @Description: Orientation of the X axis of the show coordinate system in CW direction relative to North, -1 if unset
     // @Range: -1 360
     // @Increment: 1
     // @Units: degrees
@@ -169,7 +169,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
 
     // @Param: START_AUTH
     // @DisplayName: Authorization to start
-    // @Description: Whether the drone is authorized to start
+    // @Description: Whether the drone is authorized to start the show
     // @Range: 0 1
     // @Increment: 1
     // @Volatile: True
@@ -185,7 +185,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
 
     // @Param: LED0_CHAN
     // @DisplayName: PWM or MAVLink channel to use for the LED output
-    // @Description: PWM channel to use for the LED output (1-based) if the LED type is "NeoPixel" or "ProfiLED", or the MAVLink channel to use if the LEF type is "MAVLink"
+    // @Description: PWM channel to use for the LED output (1-based) if the LED type is "NeoPixel" or "ProfiLED", or the MAVLink channel to use if the LED type is "MAVLink"
     // @User: Advanced
     AP_GROUPINFO("LED0_CHAN", 8, AC_DroneShowManager, _params.led_specs[0].channel, 0),
 
@@ -197,7 +197,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
 
     // @Param: MODE_BOOT
     // @DisplayName: Conditions for entering show mode
-    // @Description: Bitfield that Specifies when the drone should switch to show mode automatically
+    // @Description: Bitfield that specifies when the drone should switch to show mode automatically
     // @Values: 3:At boot and when authorized,2:When authorized,1:At boot,0:Never
     // @Bitmask: 0:At boot,1:When authorized
     // @User: Standard
@@ -212,7 +212,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     AP_GROUPINFO("PRE_LIGHTS", 10, AC_DroneShowManager, _params.preflight_light_signal_brightness, 2),
 
     // @Param: CTRL_MODE
-    // @DisplayName: Flags to configure the position control algorithm
+    // @DisplayName: Flags to configure the show position control algorithm
     // @Description: Controls various aspects of the position control algorithm built into the firmware
     // @Values: 1:Position and velocity control,0:Position control only
     // @Bitmask: 0:VelCtrl
@@ -220,7 +220,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     AP_GROUPINFO("CTRL_MODE", 11, AC_DroneShowManager, _params.control_mode_flags, DroneShowControl_VelocityControlEnabled),
 
     // @Param: GROUP
-    // @DisplayName: Group index
+    // @DisplayName: Show group index
     // @Description: Index of the group that this drone belongs to
     // @Range: 0 7
     // @Increment: 1
@@ -232,6 +232,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Description: Update rate of the target position and velocity during the show
     // @Range: 1 50
     // @Increment: 1
+    // @Units: Hz
     // @User: Advanced
     AP_GROUPINFO("CTRL_RATE", 14, AC_DroneShowManager, _params.control_rate_hz, DEFAULT_UPDATE_RATE_HZ),
 
@@ -240,6 +241,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Description: Maximum placement error that we tolerate before takeoff, in meters. Zero to turn off XY placement accuracy checks.
     // @Range: 0 20
     // @Increment: 0.1
+    // @Units: m
     // @User: Standard
     AP_GROUPINFO("MAX_XY_ERR", 15, AC_DroneShowManager, _params.max_xy_placement_error_m, DEFAULT_XY_PLACEMENT_ERROR_METERS),
 
@@ -256,6 +258,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Description: Altitude above current position to take off to when starting the show
     // @Range: 0 5
     // @Increment: 0.1
+    // @Units: m
     // @User: Advanced
     // @RebootRequired: True
     AP_GROUPINFO("TAKEOFF_ALT", 17, AC_DroneShowManager, _params.takeoff_altitude_m, DEFAULT_TAKEOFF_ALTITUDE_METERS),
