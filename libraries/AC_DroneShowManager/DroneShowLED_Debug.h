@@ -17,7 +17,6 @@ public:
     DroneShowLED_Debug();
 
 protected:
-    bool init(void) override;
     void set_raw_rgb(uint8_t r, uint8_t g, uint8_t b) override;
 
 private:
