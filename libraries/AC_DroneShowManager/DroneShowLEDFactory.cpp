@@ -16,7 +16,9 @@ DroneShowLEDFactory::DroneShowLEDFactory()
 {
 }
 
-DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(DroneShowLEDType type, uint8_t channel, uint8_t num_leds) {
+DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(
+    DroneShowLEDType type, uint8_t channel, uint8_t num_leds, float gamma
+) {
     uint8_t chan_red, chan_green, chan_blue;
     RGBLed* rgb_led = NULL;
 
@@ -76,6 +78,10 @@ DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(DroneShowLEDType type, ui
         // Initialization failed
         delete result;
         result = NULL;
+    }
+
+    if (result) {
+        result->set_gamma(gamma);
     }
 
     return result;

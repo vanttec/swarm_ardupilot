@@ -195,6 +195,14 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("LED0_COUNT", 7, AC_DroneShowManager, _params.led_specs[0].count, 16),
 
+    // @Param: LED0_GAMMA
+    // @DisplayName: Gamma correction factor for the LED channel
+    // @Description: Specifies the exponent of the gamma correction to apply on the RGB values of this channel. Set this to 1 if you do not want to use gamma correction or if the LEDs perform gamma correction on their own; otherwise typical values are in the range 2.2 to 2.8 for LEDs. Set a value that provides an approximately linear perceived brightness response when the LEDs are faded from full black to full white.
+    // @Range: 1 5
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("LED0_GAMMA", 19, AC_DroneShowManager, _params.led_specs[0].gamma, 1.0f),
+
     // @Param: MODE_BOOT
     // @DisplayName: Conditions for entering show mode
     // @Description: Bitfield that specifies when the drone should switch to show mode automatically
@@ -270,6 +278,8 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @User: Advanced
     // @RebootRequired: True
     AP_GROUPINFO("SYNC_MODE", 18, AC_DroneShowManager, _params.time_sync_mode, DEFAULT_SYNC_MODE),
+
+    // Currently used max parameter ID: 19; update this if you add more parameters.
 
     AP_GROUPEND
 };
@@ -1963,8 +1973,9 @@ void AC_DroneShowManager::_update_lights()
     _last_rgb_led_color = color;
 
     if (_rgb_led) {
-        // No need to test whether the RGB values changed because the RGBLed
-        // drivers do this on their own
+        // No need to test whether the RGB values or the gamma correction
+        // changed because the LED classes do this on their own
+        _rgb_led->set_gamma(_params.led_specs[0].gamma);
         _rgb_led->set_rgb(color.red, color.green, color.blue);
     }
 
@@ -2000,9 +2011,10 @@ void AC_DroneShowManager::_update_rgb_led_instance()
         int led_type = _params.led_specs[0].type;
         uint8_t channel = _params.led_specs[0].channel;
         uint8_t num_leds = _params.led_specs[0].count;
+        float gamma = _params.led_specs[0].gamma;
 
         _rgb_led = _rgb_led_factory->new_rgb_led_by_type(
-            static_cast<DroneShowLEDType>(led_type), channel, num_leds
+            static_cast<DroneShowLEDType>(led_type), channel, num_leds, gamma
         );
     }
 }

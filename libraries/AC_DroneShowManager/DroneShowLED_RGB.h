@@ -12,7 +12,7 @@ class DroneShowLED_RGB : public DroneShowLED {
 
 public:
     /// Constructor. Takes ownership of the LED instance passed into it.
-    DroneShowLED_RGB(RGBLed* led) : _rgb_led(led) {};
+    DroneShowLED_RGB(RGBLed* led) : DroneShowLED(), _rgb_led(led) {};
     ~DroneShowLED_RGB() {};
 
     /* Do not allow copies */
@@ -23,7 +23,8 @@ public:
         return _rgb_led->init();
     }
 
-    void set_rgb(uint8_t red, uint8_t green, uint8_t blue) override {
+protected:
+    void set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue) override {
         _rgb_led->set_rgb(red, green, blue);
     }
 

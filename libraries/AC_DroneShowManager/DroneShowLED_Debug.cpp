@@ -16,10 +16,10 @@ bool DroneShowLED_Debug::init()
     return true;
 }
 
-void DroneShowLED_Debug::set_rgb(uint8_t red, uint8_t green, uint8_t blue)
+void DroneShowLED_Debug::set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
 {
     if (_last_red != red || _last_green != green || _last_blue != blue) {
-        if (try_set_rgb(red, green, blue)) {
+        if (try_set_raw_rgb(red, green, blue)) {
             _last_red = red;
             _last_green = green;
             _last_blue = blue;
@@ -27,7 +27,7 @@ void DroneShowLED_Debug::set_rgb(uint8_t red, uint8_t green, uint8_t blue)
     }
 }
 
-bool DroneShowLED_Debug::try_set_rgb(uint8_t red, uint8_t green, uint8_t blue)
+bool DroneShowLED_Debug::try_set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
 {
     static uint32_t last_sent_at = 0;
     uint32_t now = AP_HAL::millis();

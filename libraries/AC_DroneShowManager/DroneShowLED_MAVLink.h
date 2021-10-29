@@ -12,7 +12,7 @@
  * RGB LED implementation that sends the current state of the RGB LED as a
  * DEBUG_VECT message on a MAVLink channel.
  */
-class DroneShowLED_MAVLink: public DroneShowLED {
+class DroneShowLED_MAVLink : public DroneShowLED {
 public:
     DroneShowLED_MAVLink(uint8_t instance = 0);
 
@@ -22,7 +22,7 @@ public:
 
 protected:
     bool init(void) override;
-    void set_rgb(uint8_t r, uint8_t g, uint8_t b) override;
+    void set_raw_rgb(uint8_t r, uint8_t g, uint8_t b) override;
 
 private:
     mavlink_channel_t _chan;
@@ -30,5 +30,5 @@ private:
 
     uint8_t _last_red, _last_green, _last_blue;
 
-    bool try_set_rgb(uint8_t red, uint8_t green, uint8_t blue);
+    bool try_set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue);
 };
