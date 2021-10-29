@@ -27,6 +27,9 @@ enum DroneShowLEDType {
 
     // LED light is attached to servo channels
     DroneShowLEDType_Servo = 6,
+
+    // LED light is driven over an I2C bus
+    DroneShowLEDType_I2C = 7,
 };
 
 class DroneShowLEDFactory

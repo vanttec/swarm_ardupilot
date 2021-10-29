@@ -7,6 +7,7 @@
 #include <SRV_Channel/SRV_Channel.h>
 
 #include "DroneShowLED_Debug.h"
+#include "DroneShowLED_I2C.h"
 #include "DroneShowLED_MAVLink.h"
 #include "DroneShowLED_RGB.h"
 #include "DroneShowLED_SerialLED.h"
@@ -53,6 +54,11 @@ DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(
 
         case DroneShowLEDType_ProfiLED:
             result = new DroneShowLED_SerialLED(DroneShowLED_SerialLEDType_ProfiLED, channel, num_leds);
+            break;
+
+        case DroneShowLEDType_I2C:
+            /* channel is the 7-bit I2C address, count is (ab)used as the I2C bus */
+            result = new DroneShowLED_I2C(num_leds, channel);
             break;
 
         case DroneShowLEDType_Debug:

@@ -179,19 +179,19 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Param: LED0_TYPE
     // @DisplayName: Assignment of LED channel 0 to a LED output type
     // @Description: Specifies where the output of the main LED light track of the show should be sent
-    // @Values: 0:Off, 1:MAVLink, 2:NeoPixel, 3:ProfiLED, 4:Debug, 5:SITL, 6:Servo
+    // @Values: 0:Off, 1:MAVLink, 2:NeoPixel, 3:ProfiLED, 4:Debug, 5:SITL, 6:Servo, 7:I2C
     // @User: Advanced
     AP_GROUPINFO("LED0_TYPE", 6, AC_DroneShowManager, _params.led_specs[0].type, 0),
 
     // @Param: LED0_CHAN
     // @DisplayName: PWM or MAVLink channel to use for the LED output
-    // @Description: PWM channel to use for the LED output (1-based) if the LED type is "NeoPixel" or "ProfiLED", or the MAVLink channel to use if the LED type is "MAVLink"
+    // @Description: PWM channel to use for the LED output (1-based) if the LED type is "NeoPixel" or "ProfiLED"; the MAVLink channel to use if the LED type is "MAVLink"; the I2C address of the LED if the LED type is "I2C"
     // @User: Advanced
     AP_GROUPINFO("LED0_CHAN", 8, AC_DroneShowManager, _params.led_specs[0].channel, 0),
 
     // @Param: LED0_COUNT
     // @DisplayName: Number of individual LEDs on a LED channel
-    // @Description: Specifies how many LEDs there are on a NeoPixel or ProfiLED LED strip
+    // @Description: For NeoPixel or ProfiLED LED strips: specifies how many LEDs there are on the strip. For I2C LEDs: specifies the index of the bus that the LED is attached to.
     // @User: Advanced
     AP_GROUPINFO("LED0_COUNT", 7, AC_DroneShowManager, _params.led_specs[0].count, 16),
 
