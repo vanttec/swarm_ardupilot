@@ -27,10 +27,10 @@ bool DroneShowLED_MAVLink::init()
     }
 }
 
-void DroneShowLED_MAVLink::set_rgb(uint8_t red, uint8_t green, uint8_t blue)
+void DroneShowLED_MAVLink::set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
 {
     if (_last_red != red || _last_green != green || _last_blue != blue) {
-        if (try_set_rgb(red, green, blue)) {
+        if (try_set_raw_rgb(red, green, blue)) {
             _last_red = red;
             _last_green = green;
             _last_blue = blue;
@@ -38,7 +38,7 @@ void DroneShowLED_MAVLink::set_rgb(uint8_t red, uint8_t green, uint8_t blue)
     }
 }
 
-bool DroneShowLED_MAVLink::try_set_rgb(uint8_t red, uint8_t green, uint8_t blue)
+bool DroneShowLED_MAVLink::try_set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
 {
     mavlink_channel_t chan = _chan;
 

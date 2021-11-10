@@ -18,6 +18,7 @@
 # boards to build for.
 
 BOARDS=${BOARDS:-"sitl Pixhawk1 cmcopter CubeBlack entron300 fmuv4 fmuv5 luminousbee-mini2 luminousbee5"}
+ARM_TOOLCHAIN=${ARM_TOOLCHAIN:-"${HOME}/opt/toolchains/ardupilot"}
 
 set -e
 
@@ -26,12 +27,27 @@ cd "`dirname $0`"
 mkdir -p dist/
 
 if [ ! -d .venv ]; then
-    python3 -m venv .venv
+    python2.7 -m venv .venv
     .venv/bin/pip install -U pip wheel
     .venv/bin/pip install future empy
 fi
 
-export PATH=.venv/bin:$PATH
+export PATH=".venv/bin:$PATH"
+if [ ! -d "${ARM_TOOLCHAIN}" ]; then
+    echo "/!\\ ARM toolchain suggested by the ArduPilot developers is not installed."
+	while true; do
+		read -p "    Do you want to continue? [y/N] " yn
+		case $yn in
+			[Yy]* ) break;;
+			[Nn]* ) exit;;
+			* ) echo ""; echo "    Please respond with yes or no.";;
+		esac
+	done
+fi
+
+if [ -d "${ARM_TOOLCHAIN}" ]; then
+	export PATH="${ARM_TOOLCHAIN}/bin:$PATH"
+fi
 
 DATE=`date +%Y%m%d`
 

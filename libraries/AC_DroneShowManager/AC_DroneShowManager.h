@@ -437,6 +437,9 @@ private:
 
             // Specifies the number of LEDs on a LED strip at the given channel; used only for NeoPixel or ProfiLED types
             AP_Int8 count;
+
+            // The exponent of the gamma correcion on this LED light channel
+            AP_Float gamma;
         } led_specs[1];
     } _params;
 

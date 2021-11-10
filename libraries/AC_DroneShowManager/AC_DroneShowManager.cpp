@@ -179,21 +179,29 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @Param: LED0_TYPE
     // @DisplayName: Assignment of LED channel 0 to a LED output type
     // @Description: Specifies where the output of the main LED light track of the show should be sent
-    // @Values: 0:Off, 1:MAVLink, 2:NeoPixel, 3:ProfiLED, 4:Debug, 5:SITL, 6:Servo
+    // @Values: 0:Off, 1:MAVLink, 2:NeoPixel, 3:ProfiLED, 4:Debug, 5:SITL, 6:Servo, 7:I2C
     // @User: Advanced
     AP_GROUPINFO("LED0_TYPE", 6, AC_DroneShowManager, _params.led_specs[0].type, 0),
 
     // @Param: LED0_CHAN
     // @DisplayName: PWM or MAVLink channel to use for the LED output
-    // @Description: PWM channel to use for the LED output (1-based) if the LED type is "NeoPixel" or "ProfiLED", or the MAVLink channel to use if the LED type is "MAVLink"
+    // @Description: PWM channel to use for the LED output (1-based) if the LED type is "NeoPixel" or "ProfiLED"; the MAVLink channel to use if the LED type is "MAVLink"; the I2C address of the LED if the LED type is "I2C"
     // @User: Advanced
     AP_GROUPINFO("LED0_CHAN", 8, AC_DroneShowManager, _params.led_specs[0].channel, 0),
 
     // @Param: LED0_COUNT
     // @DisplayName: Number of individual LEDs on a LED channel
-    // @Description: Specifies how many LEDs there are on a NeoPixel or ProfiLED LED strip
+    // @Description: For NeoPixel or ProfiLED LED strips: specifies how many LEDs there are on the strip. For I2C LEDs: specifies the index of the bus that the LED is attached to.
     // @User: Advanced
     AP_GROUPINFO("LED0_COUNT", 7, AC_DroneShowManager, _params.led_specs[0].count, 16),
+
+    // @Param: LED0_GAMMA
+    // @DisplayName: Gamma correction factor for the LED channel
+    // @Description: Specifies the exponent of the gamma correction to apply on the RGB values of this channel. Set this to 1 if you do not want to use gamma correction or if the LEDs perform gamma correction on their own; otherwise typical values are in the range 2.2 to 2.8 for LEDs. Set a value that provides an approximately linear perceived brightness response when the LEDs are faded from full black to full white.
+    // @Range: 1 5
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("LED0_GAMMA", 19, AC_DroneShowManager, _params.led_specs[0].gamma, 1.0f),
 
     // @Param: MODE_BOOT
     // @DisplayName: Conditions for entering show mode
@@ -270,6 +278,8 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @User: Advanced
     // @RebootRequired: True
     AP_GROUPINFO("SYNC_MODE", 18, AC_DroneShowManager, _params.time_sync_mode, DEFAULT_SYNC_MODE),
+
+    // Currently used max parameter ID: 19; update this if you add more parameters.
 
     AP_GROUPEND
 };
@@ -1963,8 +1973,9 @@ void AC_DroneShowManager::_update_lights()
     _last_rgb_led_color = color;
 
     if (_rgb_led) {
-        // No need to test whether the RGB values changed because the RGBLed
-        // drivers do this on their own
+        // No need to test whether the RGB values or the gamma correction
+        // changed because the LED classes do this on their own
+        _rgb_led->set_gamma(_params.led_specs[0].gamma);
         _rgb_led->set_rgb(color.red, color.green, color.blue);
     }
 
@@ -2000,9 +2011,10 @@ void AC_DroneShowManager::_update_rgb_led_instance()
         int led_type = _params.led_specs[0].type;
         uint8_t channel = _params.led_specs[0].channel;
         uint8_t num_leds = _params.led_specs[0].count;
+        float gamma = _params.led_specs[0].gamma;
 
         _rgb_led = _rgb_led_factory->new_rgb_led_by_type(
-            static_cast<DroneShowLEDType>(led_type), channel, num_leds
+            static_cast<DroneShowLEDType>(led_type), channel, num_leds, gamma
         );
     }
 }

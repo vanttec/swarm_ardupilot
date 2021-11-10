@@ -16,7 +16,7 @@ typedef enum {
  * RGB LED implementation that sends the current state of the RGB LED to a
  * NeoPixel LED strip.
  */
-class DroneShowLED_SerialLED: public DroneShowLED {
+class DroneShowLED_SerialLED : public DroneShowLED {
 public:
     DroneShowLED_SerialLED(
         DroneShowLED_SerialLEDType type, uint8_t chan = 1, uint8_t num_leds = 16
@@ -28,7 +28,7 @@ public:
 
 protected:
     bool init(void) override;
-    void set_rgb(uint8_t r, uint8_t g, uint8_t b) override;
+    void set_raw_rgb(uint8_t r, uint8_t g, uint8_t b) override;
 
 private:
     uint8_t _chan;
@@ -37,5 +37,5 @@ private:
 
     uint8_t _last_red, _last_green, _last_blue;
 
-    bool try_set_rgb(uint8_t red, uint8_t green, uint8_t blue);
+    bool try_set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue);
 };

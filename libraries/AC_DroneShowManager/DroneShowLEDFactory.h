@@ -27,6 +27,9 @@ enum DroneShowLEDType {
 
     // LED light is attached to servo channels
     DroneShowLEDType_Servo = 6,
+
+    // LED light is driven over an I2C bus
+    DroneShowLEDType_I2C = 7,
 };
 
 class DroneShowLEDFactory
@@ -40,8 +43,11 @@ public:
 
     /**
      * Creates a new DroneShowLED instance, given the LED type, the channel
-     * index (if the LED type support multiple channels) and the number of
-     * LEDs on this channel (for NeoPixel or ProfiLED strips).
+     * index (if the LED type support multiple channels), the number of
+     * LEDs on this channel (for NeoPixel or ProfiLED strips) and the
+     * gamma correction factor.
      */
-    DroneShowLED* new_rgb_led_by_type(DroneShowLEDType type, uint8_t channel, uint8_t num_leds);
+    DroneShowLED* new_rgb_led_by_type(
+        DroneShowLEDType type, uint8_t channel, uint8_t num_leds, float gamma
+    );
 };

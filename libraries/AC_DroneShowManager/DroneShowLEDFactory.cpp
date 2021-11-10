@@ -7,6 +7,7 @@
 #include <SRV_Channel/SRV_Channel.h>
 
 #include "DroneShowLED_Debug.h"
+#include "DroneShowLED_I2C.h"
 #include "DroneShowLED_MAVLink.h"
 #include "DroneShowLED_RGB.h"
 #include "DroneShowLED_SerialLED.h"
@@ -16,7 +17,9 @@ DroneShowLEDFactory::DroneShowLEDFactory()
 {
 }
 
-DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(DroneShowLEDType type, uint8_t channel, uint8_t num_leds) {
+DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(
+    DroneShowLEDType type, uint8_t channel, uint8_t num_leds, float gamma
+) {
     uint8_t chan_red, chan_green, chan_blue;
     RGBLed* rgb_led = NULL;
 
@@ -53,6 +56,11 @@ DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(DroneShowLEDType type, ui
             result = new DroneShowLED_SerialLED(DroneShowLED_SerialLEDType_ProfiLED, channel, num_leds);
             break;
 
+        case DroneShowLEDType_I2C:
+            /* channel is the 7-bit I2C address, count is (ab)used as the I2C bus */
+            result = new DroneShowLED_I2C(num_leds, channel);
+            break;
+
         case DroneShowLEDType_Debug:
             result = new DroneShowLED_Debug();
             break;
@@ -76,6 +84,10 @@ DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(DroneShowLEDType type, ui
         // Initialization failed
         delete result;
         result = NULL;
+    }
+
+    if (result) {
+        result->set_gamma(gamma);
     }
 
     return result;
