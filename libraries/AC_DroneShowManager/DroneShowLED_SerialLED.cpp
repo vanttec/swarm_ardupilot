@@ -25,7 +25,7 @@ bool DroneShowLED_SerialLED::init(void)
 
 void DroneShowLED_SerialLED::set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
 {
-    if (_last_red != red || _last_green != green || _last_blue != blue) {
+    if (true || _last_red != red || _last_green != green || _last_blue != blue) {
         if (try_set_raw_rgb(red, green, blue)) {
             _last_red = red;
             _last_green = green;
