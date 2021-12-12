@@ -22,7 +22,7 @@ public:
     bool init(void) override;
 
 protected:
-    void set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue) override;
+    bool set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue) override;
 
 private:
     /** The index of the I2C bus */
@@ -38,12 +38,13 @@ private:
      * data structure between the main thread and the I2C timer thread */
     HAL_Semaphore _sem;
 
+    /** Storage for the message that we are about to send on the I2C bus.
+     * Protected by the semaphore. */
+    uint8_t _msg[3];
+
     /** Stores whether a new command has to be sent on the I2C bus to change the
      * LED state */
     bool _send_required;
-
-    /** Stores the red, green and blue colors to set on the LED */
-    uint8_t _last_red, _last_green, _last_blue;
 
     void _timer(void);
 };

@@ -4,8 +4,7 @@ extern const AP_HAL::HAL& hal;
 
 DroneShowLED_I2C::DroneShowLED_I2C(uint8_t bus, uint8_t addr)
     : DroneShowLED(),
-    _bus(bus), _addr(addr), _send_required(false),
-    _last_red(0), _last_green(0), _last_blue(0)
+    _bus(bus), _addr(addr), _send_required(false)
 {
 }
 
@@ -22,18 +21,16 @@ bool DroneShowLED_I2C::init()
     return true;
 }
 
-void DroneShowLED_I2C::set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
+bool DroneShowLED_I2C::set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
 {
     WITH_SEMAPHORE(_sem);
 
-    if (_last_red == red && _last_green == green && _last_blue == blue) {
-        return;
-    }
-
-    _last_red = red;
-    _last_green = green;
-    _last_blue = blue;
+    _msg[0] = red;
+    _msg[1] = green;
+    _msg[2] = blue;
     _send_required = true;
+
+    return true;
 }
 
 void DroneShowLED_I2C::_timer(void)
@@ -46,11 +43,8 @@ void DroneShowLED_I2C::_timer(void)
         return;
     }
 
-    hal.console->printf("Foo\n");
-
     _send_required = false;
-    msg[0] = _last_red;
-    msg[1] = _last_green;
-    msg[2] = _last_blue;
+    memcpy(msg, _msg, sizeof(msg));
+
     _dev->transfer(msg, sizeof(msg), nullptr, 0);
 }

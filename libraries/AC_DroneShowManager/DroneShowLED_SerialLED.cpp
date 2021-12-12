@@ -23,18 +23,7 @@ bool DroneShowLED_SerialLED::init(void)
     return false;
 }
 
-void DroneShowLED_SerialLED::set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
-{
-    if (_last_red != red || _last_green != green || _last_blue != blue) {
-        if (try_set_raw_rgb(red, green, blue)) {
-            _last_red = red;
-            _last_green = green;
-            _last_blue = blue;
-        }
-    }
-}
-
-bool DroneShowLED_SerialLED::try_set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
+bool DroneShowLED_SerialLED::set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
 {
     AP_SerialLED* serialLed = AP_SerialLED::get_singleton();
 

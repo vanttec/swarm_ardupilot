@@ -365,7 +365,9 @@ public:
 
     // Updates the state of the LED light on the drone and performs any additional
     // tasks that have to be performed regularly (such as checking for changes
-    // in parameter values).
+    // in parameter values). This has to be called at 50 Hz, but most of its
+    // subroutines run at 25 Hz, except _repeat_last_rgb_led_command(), which
+    // may be called more frequently.
     void update();
 
     // Returns whether the manager uses GPS time to start the show
@@ -643,6 +645,12 @@ private:
     // function updates the identity of the RGB LED object based on the current
     // servo channel settings, _not_ the state of the LED itself
     void _update_rgb_led_instance();
+
+    // Repeats the last LED command. Used when the channel that transmits the
+    // LED color change commands to the LED module is unreliable. Called
+    // regularly from update(), typically faster than the regular LED update
+    // routine.
+    void _repeat_last_rgb_led_command();
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     bool _open_rgb_led_socket();

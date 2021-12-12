@@ -8,10 +8,7 @@ static const char message_name[10] = "rgb";
 
 DroneShowLED_MAVLink::DroneShowLED_MAVLink(uint8_t instance) : DroneShowLED(),
     _instance(instance),
-    _chan(MAVLINK_COMM_0),
-    _last_red(0),
-    _last_green(0),
-    _last_blue(0)
+    _chan(MAVLINK_COMM_0)
 {
 }
 
@@ -27,18 +24,7 @@ bool DroneShowLED_MAVLink::init()
     }
 }
 
-void DroneShowLED_MAVLink::set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
-{
-    if (_last_red != red || _last_green != green || _last_blue != blue) {
-        if (try_set_raw_rgb(red, green, blue)) {
-            _last_red = red;
-            _last_green = green;
-            _last_blue = blue;
-        }
-    }
-}
-
-bool DroneShowLED_MAVLink::try_set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
+bool DroneShowLED_MAVLink::set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
 {
     mavlink_channel_t chan = _chan;
 

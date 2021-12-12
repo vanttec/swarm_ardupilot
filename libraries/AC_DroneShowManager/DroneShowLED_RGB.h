@@ -24,8 +24,9 @@ public:
     }
 
 protected:
-    void set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue) override {
+    bool set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue) override {
         _rgb_led->set_rgb(red, green, blue);
+        return true;
     }
 
 private:

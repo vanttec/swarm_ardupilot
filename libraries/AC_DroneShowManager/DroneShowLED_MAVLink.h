@@ -22,13 +22,9 @@ public:
 
 protected:
     bool init(void) override;
-    void set_raw_rgb(uint8_t r, uint8_t g, uint8_t b) override;
+    bool set_raw_rgb(uint8_t r, uint8_t g, uint8_t b) override;
 
 private:
     mavlink_channel_t _chan;
     uint8_t _instance;
-
-    uint8_t _last_red, _last_green, _last_blue;
-
-    bool try_set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue);
 };
