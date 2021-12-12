@@ -964,11 +964,19 @@ void AC_DroneShowManager::stop_if_running()
 
 void AC_DroneShowManager::update()
 {
-    _check_changes_in_parameters();
-    _check_events();
-    _check_radio_failsafe();
-    _update_preflight_check_result();
-    _update_lights();
+    static bool main_cycle = true;
+
+    if (main_cycle) {
+        _check_changes_in_parameters();
+        _check_events();
+        _check_radio_failsafe();
+        _update_preflight_check_result();
+        _update_lights();
+    } else {
+        _repeat_last_rgb_led_command();
+    }
+
+    main_cycle = !main_cycle;
 }
 
 void AC_DroneShowManager::_check_changes_in_parameters()
@@ -2040,6 +2048,13 @@ bool AC_DroneShowManager::_open_rgb_led_socket()
 }
 
 #endif
+
+void AC_DroneShowManager::_repeat_last_rgb_led_command()
+{
+    if (_rgb_led) {
+        _rgb_led->repeat_last_command_if_needed();
+    }
+}
 
 void AC_DroneShowManager::ShowCoordinateSystem::clear()
 {
