@@ -826,6 +826,8 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
     uint8_t flags, flags2, gps_health;
     float elapsed_time;
     int16_t encoded_elapsed_time;
+    int32_t encoded_start_time;
+    uint16_t encoded_led_color;
     DroneShowModeStage stage = get_stage_in_drone_show_mode();
 
     /* make sure that we can make use of MAVLink packet truncation */
@@ -880,13 +882,15 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
      * start time according to GPS timestamps, even if we are using the
      * internal clock to synchronize the start. This is to make sure that the
      * UI on Skybrush Live shows the GPS timestamp set by the user */
-    *(( int32_t*) (packet + 0)) = _params.start_time_gps_sec;
-    *((uint16_t*) (packet + 4)) = sb_rgb_color_encode_rgb565(_last_rgb_led_color);
+    encoded_start_time = _params.start_time_gps_sec;
+    encoded_led_color = sb_rgb_color_encode_rgb565(_last_rgb_led_color);
+    memcpy(packet, &encoded_start_time, sizeof(encoded_start_time));
+    memcpy(packet + 4, &encoded_led_color, sizeof(encoded_led_color));
     packet[6] = flags;
     packet[7] = flags2;
     packet[8] = gps_health;
     packet[9] = _boot_count & 0x03; // upper 6 bits are unused yet
-    *(( int16_t*) (packet + 10)) = encoded_elapsed_time;
+    memcpy(packet + 10, &encoded_elapsed_time, sizeof(encoded_elapsed_time));
 
     mavlink_msg_data16_send(
         chan,
