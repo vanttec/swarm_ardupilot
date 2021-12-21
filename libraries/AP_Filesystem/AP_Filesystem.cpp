@@ -247,6 +247,12 @@ FileData *AP_Filesystem::load_file(const char *filename)
 }
 
 
+// format filesystem
+bool AP_Filesystem::format(void)
+{
+    return LOCAL_BACKEND.fs.format();
+}
+
 namespace AP
 {
 AP_Filesystem &FS()
