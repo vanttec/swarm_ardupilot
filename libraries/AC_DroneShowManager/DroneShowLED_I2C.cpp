@@ -10,7 +10,7 @@ DroneShowLED_I2C::DroneShowLED_I2C(uint8_t bus, uint8_t addr)
 
 bool DroneShowLED_I2C::init()
 {
-    _dev = std::move(hal.i2c_mgr->get_device(_bus, _addr));
+    _dev = hal.i2c_mgr->get_device(_bus, _addr);
     if (!_dev) {
         return false;
     }
