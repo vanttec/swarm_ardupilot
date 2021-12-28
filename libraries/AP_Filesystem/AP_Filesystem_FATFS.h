@@ -54,11 +54,4 @@ public:
 
     // unmount filesystem for reboot
     void unmount(void) override;
-
-    // format sdcard
-    bool format(void) override;
-
-private:
-    void format_handler(void);
-    bool format_pending;
 };

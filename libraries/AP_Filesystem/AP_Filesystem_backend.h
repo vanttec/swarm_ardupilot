@@ -71,9 +71,6 @@ public:
     // unmount filesystem for reboot
     virtual void unmount(void) {}
 
-    // format sdcard
-    virtual bool format(void) { return false; }
-    
     /*
       load a full file. Use delete to free the data
      */

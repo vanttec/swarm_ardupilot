@@ -89,9 +89,6 @@ public:
     // unmount filesystem for reboot
     void unmount(void);
 
-    // format filesystem
-    bool format(void);
-    
     /*
       load a full file. Use delete to free the data
      */
