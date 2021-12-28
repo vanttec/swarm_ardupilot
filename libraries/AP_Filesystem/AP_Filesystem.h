@@ -42,12 +42,23 @@ struct dirent {
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
+
+#ifndef AP_FILESYSTEM_FORMAT_ENABLED
+// only enable for SDMMC filesystems for now as other types can't query
+// block size
+#define AP_FILESYSTEM_FORMAT_ENABLED (STM32_SDC_USE_SDMMC1==TRUE || STM32_SDC_USE_SDMMC2==TRUE)
+#endif
+
 #endif // HAL_BOARD_CHIBIOS
 #if CONFIG_HAL_BOARD == HAL_BOARD_LINUX || CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #include "AP_Filesystem_posix.h"
 #endif
 
 #include "AP_Filesystem_backend.h"
+
+#ifndef AP_FILESYSTEM_FORMAT_ENABLED
+#define AP_FILESYSTEM_FORMAT_ENABLED 0
+#endif
 
 class AP_Filesystem {
 private:
@@ -89,6 +100,9 @@ public:
     // unmount filesystem for reboot
     void unmount(void);
 
+    // format filesystem
+    bool format(void);
+    
     /*
       load a full file. Use delete to free the data
      */
