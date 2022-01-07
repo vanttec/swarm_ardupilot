@@ -8,6 +8,7 @@
 # CubeBlack -- for Sparkl One
 # entron300 -- for the Entron 300, which is a Pixhawk1 with some special hacks to fix the GPS autoconfig issue
 # fmuv2 -- for droneshow.mx
+# fmuv3 -- for Jose Muxi
 # fmuv4 -- for FlyFire
 # fmuv5 -- for the Holybro Pixhawk 4
 # luminuousbee5 -- for LuminousBee5 outdoor
@@ -17,7 +18,7 @@
 # You may define the BOARDS= variable in the environment to override which
 # boards to build for.
 
-BOARDS=${BOARDS:-"sitl Pixhawk1 cmcopter CubeBlack entron300 fmuv4 fmuv5 luminousbee-mini2 luminousbee5"}
+BOARDS=${BOARDS:-"sitl Pixhawk1 cmcopter CubeBlack entron300 fmuv3 fmuv4 fmuv5 luminousbee-mini2 luminousbee5"}
 ARM_TOOLCHAIN=${ARM_TOOLCHAIN:-"${HOME}/opt/toolchains/ardupilot"}
 
 set -e
