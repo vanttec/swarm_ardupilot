@@ -1832,15 +1832,15 @@ void AC_DroneShowManager::_update_lights()
         } else if (mode == MODE_DRONE_SHOW) {
             // If we are flying in drone show mode, show the color that we are
             // supposed to show during the drone show if the show has started.
-            // If the show has not started, show white, although this should not
-            // happen (we cannot be in drone show mode and flying if we are
-            // before the scheduled start time).
-            //
-            // TODO(ntamas): what if we were late to the party and we are loitering
-            // only?
+            // If the show has not started, show white, which is useful if the
+            // user took off manually from the GCS just to test the takeoff.
+            // Also show white if we are loitering, which happens in certain
+            // conditions (e.g., after a takeoff test).
             if (_stage_in_drone_show_mode == DroneShow_Error) {
                 color = Colors::RED;
                 pattern = BLINK;
+            } else if (_stage_in_drone_show_mode == DroneShow_Loiter) {
+                color = Colors::WHITE;
             } else {
                 elapsed_time = get_elapsed_time_since_start_sec();
                 if (elapsed_time >= 0) {
