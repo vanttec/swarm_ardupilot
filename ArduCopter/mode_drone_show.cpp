@@ -518,7 +518,7 @@ bool ModeDroneShow::takeoff_completed() const
 bool ModeDroneShow::takeoff_timed_out() const
 {
     if (_stage == DroneShow_Takeoff) {
-        return AP_HAL::millis() - _last_stage_change_at > 5000;
+        return get_elapsed_time_since_last_stage_change_msec() > 10000;
     } else {
         return false;
     }
