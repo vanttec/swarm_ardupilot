@@ -1435,11 +1435,7 @@ bool AC_DroneShowManager::_is_gps_time_ok() const
 
 bool AC_DroneShowManager::is_prepared_to_take_off() const
 {
-    return (
-        _stage_in_drone_show_mode == DroneShow_WaitForStartTime &&
-        !_preflight_check_failures &&
-        _is_gps_time_ok()
-    );
+    return (!_preflight_check_failures && _is_gps_time_ok());
 }
 
 bool AC_DroneShowManager::_load_show_file_from_storage()

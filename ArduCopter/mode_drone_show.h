@@ -35,6 +35,9 @@ public:
     bool has_manual_throttle() const override { return false; }
     bool allows_arming(AP_Arming::Method method) const override;
     bool is_autopilot() const override { return true; }
+    bool has_user_takeoff(bool must_navigate) const override { return true; }
+    /* in_guided_mode() should not return true because that would allow
+     * scripting or GCS commands to mess around with the show execution */
 
     bool is_landing() const override;
     bool is_taking_off() const override;
@@ -45,6 +48,9 @@ protected:
 
     const char *name() const override { return "DRONE_SHOW"; }
     const char *name4() const override { return "SHOW"; }
+
+    // customize takeoff behaviour to be mostly identical to guided mode
+    bool do_user_takeoff_start(float takeoff_alt_cm) override;
 
     // for reporting to GCS
     bool get_wp(Location &loc) override;
@@ -60,7 +66,8 @@ private:
     DroneShowModeStage _stage;
 
     // Stores whether we have attempted to start the motors, due 10 seconds
-    // before takeoff.
+    // before takeoff. Note that it does _not_ indicate whether the motors are
+    // actually _running_.
     bool _motors_started;
 
     // Stores the timestamp when we have last attempted to set the home position
@@ -77,6 +84,11 @@ private:
     // before takeoff.
     bool _home_position_set;
 
+    // Stores which stage to step to after the takeoff has completed. This
+    // distinguishes "test takeoff" instructed from the GCS with a takeoff command
+    // from "live takeoff", which happens when the start time is reached.
+    DroneShowModeStage _next_stage_after_takeoff;
+
     // Stores whether we have performed the preflight calibration before takeoff.
     bool _preflight_calibration_done;
 
@@ -89,13 +101,15 @@ private:
 
     bool cancel_requested() const;
     int32_t get_elapsed_time_since_last_home_position_reset_attempt_msec() const;
+    int32_t get_elapsed_time_since_last_stage_change_msec() const;
 
     void check_changes_in_parameters();
     void notify_authorization_changed();
     void notify_start_time_changed();
     bool send_guided_mode_command_during_performance();
-    bool start_motors_if_needed();
+    bool start_motors_if_not_running() WARN_IF_UNUSED;
     bool try_to_update_home_position();
+    bool try_to_start_motors_if_prepared_to_take_off();
 
     void initialization_start();
     void initialization_run();

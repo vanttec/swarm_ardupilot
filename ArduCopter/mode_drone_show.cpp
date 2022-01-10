@@ -71,9 +71,42 @@ bool ModeDroneShow::cancel_requested() const
     return copter.g2.drone_show_manager.cancel_requested();
 }
 
+// Handles the takeoff command when sent from the GCS. This can be used for
+// testing the takeoff before the show.
+//
+// We need to override the default implementation of Mode::do_user_takeoff_start()
+// because that one would require the pilot to use the throttle to take off.
+// Here we simply send the drone to the "takeoff" state.
+bool ModeDroneShow::do_user_takeoff_start(float takeoff_alt_cm)
+{
+    // takeoff_alt_cm is ignored. This is deliberate; I do not want to complicate
+    // the logic in takeoff_start(). The takeoff altitude can be configured in
+    // a parameter (SHOW_TAKEOFF_ALT)
+    if (try_to_start_motors_if_prepared_to_take_off()) {
+        takeoff_start();
+    }
+
+    // takeoff_start() may not succeed if the user has not configured a show
+    // origin so we check whether we have entered the takeoff stage and return
+    // false if we have not.
+    if (_stage == DroneShow_Takeoff) {
+        // Remember to start loitering after takeoff, and indicate successs
+        _next_stage_after_takeoff = DroneShow_Loiter;
+        return true;
+    } else {
+        // Return failure to the GCS
+        return false;
+    }
+}
+
 int32_t ModeDroneShow::get_elapsed_time_since_last_home_position_reset_attempt_msec() const
 {
     return AP_HAL::millis() - _last_home_position_reset_attempt_at;
+}
+
+int32_t ModeDroneShow::get_elapsed_time_since_last_stage_change_msec() const
+{
+    return AP_HAL::millis() - _last_stage_change_at;
 }
 
 // ModeDroneShow::run - runs the main drone show controller
@@ -239,6 +272,9 @@ void ModeDroneShow::initialization_start()
     // Set the appropriate stage
     _set_stage(DroneShow_Init);
 
+    // Assume normal operation: we will start performing after the takeoff
+    _next_stage_after_takeoff = DroneShow_Performing;
+
     // Clear the timestamp when we last attempted to arm the drone
     _prevent_arming_until_msec = 0;
 
@@ -282,6 +318,9 @@ void ModeDroneShow::initialization_run()
 void ModeDroneShow::wait_for_start_time_start()
 {
     _set_stage(DroneShow_WaitForStartTime);
+
+    // Remember that we have not attempted to start the motors yet
+    _motors_started = false;
 
     // Reset home position to current location
     try_to_update_home_position();
@@ -362,7 +401,7 @@ void ModeDroneShow::wait_for_start_time_run()
                 // No need to set the home position once again; arming the motors
                 // will reset AGL to zero.
                 if (time_since_takeoff_sec < latest_takeoff_attempt_after_scheduled_takeoff_time_in_seconds) {
-                    if (copter.g2.drone_show_manager.is_prepared_to_take_off() && start_motors_if_needed()) {
+                    if (try_to_start_motors_if_prepared_to_take_off()) {
                         // Great, motors started
                         _motors_started = true;
                     }
@@ -476,6 +515,9 @@ void ModeDroneShow::takeoff_start()
 // performs the takeoff stage
 void ModeDroneShow::takeoff_run()
 {
+    bool completed = false;
+    bool timed_out = false;
+
     // make sure that the yaw target is still our current heading. Something
     // overwrites it in the ArduCopter code during takeoff but I could not
     // find the culprit so far.
@@ -488,16 +530,41 @@ void ModeDroneShow::takeoff_run()
         landing_start();
     } else if (!motors->armed()) {
         // if the motors are not armed any more, something is wrong so move to the
-        // error stage. This typically happens if we crash during a show.
+        // error stage. This typically happens if we crash during takeoff.
         error_start();
     } else if (takeoff_completed()) {
-        // if the takeoff has finished, move to the "show" stage
-        performing_start();
+        // if the takeoff has finished, move to the next stage
+        completed = true;
     } else if (takeoff_timed_out()) {
-        // if the takeoff takes too long, move to the "show" stage anyway after
+        // if the takeoff takes too long, move to the next stage anyway after
         // emitting a warning
-        gcs().send_text(MAV_SEVERITY_WARNING, "Takeoff took too long");
-        performing_start();
+        completed = true;
+        timed_out = true;
+    }
+
+    if (completed) {
+        // Choose what the next stage should be. The default stage is "performing",
+        // except if we are specifically instructed to start loitering or
+        // landing instead (for testing purposes)
+        switch (_next_stage_after_takeoff) {
+            case DroneShow_Loiter:
+                loiter_start();
+                break;
+
+            case DroneShow_Landing:
+            case DroneShow_Landed:
+                landing_start();
+                break;
+
+            default:
+                if (timed_out) {
+                    gcs().send_text(MAV_SEVERITY_WARNING, "Takeoff took too long");
+                }
+                performing_start();
+        }
+
+        // Reset the "next stage after takeoff" marker to its default
+        _next_stage_after_takeoff = DroneShow_Performing;
     }
 }
 
@@ -506,7 +573,23 @@ void ModeDroneShow::takeoff_run()
 bool ModeDroneShow::takeoff_completed() const
 {
     if (_stage == DroneShow_Takeoff) {
-        return wp_nav->reached_wp_destination();
+        if (
+            _next_stage_after_takeoff == DroneShow_Loiter ||
+            _next_stage_after_takeoff == DroneShow_Landing ||
+            _next_stage_after_takeoff == DroneShow_Landed
+        ) {
+            /* ensure that we spend at least five seconds with taking off.
+             * This is needed because wp_nav->reached_wp_destination() will
+             * trigger as soon as we are within WPNAV_RADIUS of the target
+             * altitude, and switching to loitering immediately will mean that
+             * we start loitering at an altitude below the desired one.
+             * Yes, this is an ugly hack, but there is no way to start the
+             * loiter mode while also specifying a target altitude to loiter at
+             */
+            return wp_nav->reached_wp_destination() && takeoff_timed_out();
+        } else {
+            return wp_nav->reached_wp_destination();
+        }
     } else if (_stage >= DroneShow_Performing && _stage <= DroneShow_Landed) {
         return true;
     } else {
@@ -772,9 +855,6 @@ void ModeDroneShow::notify_start_time_changed()
 
     // Clear whether the home position was set before takeoff
     _home_position_set = false;
-
-    // Clear whether the motors were started
-    _motors_started = false;
 }
 
 // Sends a guided mode command during the show performance, calculated from the
@@ -826,23 +906,34 @@ bool ModeDroneShow::send_guided_mode_command_during_performance()
     }
 }
 
-// Starts the motors before the show if they are not running already
-bool ModeDroneShow::start_motors_if_needed()
+// Starts the motors before the show if they are not running already, irrespectively
+// of whether the drone is ready to perform the show or not.
+bool ModeDroneShow::start_motors_if_not_running()
 {
+    bool success = false;
+
     if (AP::arming().is_armed()) {
         // Already armed
-        return true;
+        success = true;
     } else if (_prevent_arming_until_msec > AP_HAL::millis()) {
         // Arming prevented because we have tried it recently
-        return false;
     } else if (AP::arming().arm(AP_Arming::Method::SCRIPTING, /* do_arming_checks = */ true)) {
         // Started motors successfully
-        return true;
+        success = true;
     } else {
         // Prearm checks failed; prevent another attempt for the next second
         _prevent_arming_until_msec = AP_HAL::millis() + 1000;
-        return false;
     }
+
+    return success;
+}
+
+// Starts the motors before the show if they are not running already, after
+// checking whether the drone is prepared to take off (according to the
+// show manager)
+bool ModeDroneShow::try_to_start_motors_if_prepared_to_take_off()
+{
+    return copter.g2.drone_show_manager.is_prepared_to_take_off() && start_motors_if_not_running();
 }
 
 // Tries to update the home position of the drone to its current location
