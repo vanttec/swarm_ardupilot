@@ -406,7 +406,6 @@ void ModeDroneShow::wait_for_start_time_run()
                         _motors_started = true;
                     }
                 } else {
-                    // Do not change or remove this message; it is used in test cases
                     error_start();
                 }
             }
@@ -638,6 +637,7 @@ void ModeDroneShow::performing_run()
         if (!send_guided_mode_command_during_performance()) {
             // Failed to send guided mode command; try to switch to position
             // hold instead. This should not happen anyway.
+            gcs().send_text(MAV_SEVERITY_ERROR, "Failed to send guided mode command");
             loiter_start();
             exited_mode = 1;
         }
@@ -864,6 +864,9 @@ bool ModeDroneShow::send_guided_mode_command_during_performance()
     Location loc;
     Vector3f pos;
     Vector3f vel;
+    Vector3f acc;
+    static uint8_t invalid_velocity_warning_sent = 0;
+    static uint8_t invalid_acceleration_warning_sent = 0;
     // static uint8_t counter = 0;
 
     float elapsed = copter.g2.drone_show_manager.get_elapsed_time_since_start_sec();
@@ -880,6 +883,7 @@ bool ModeDroneShow::send_guided_mode_command_during_performance()
         */
 
         vel.zero();
+        acc.zero();
 
         if (copter.g2.drone_show_manager.is_velocity_control_enabled())
         {
@@ -890,12 +894,48 @@ bool ModeDroneShow::send_guided_mode_command_during_performance()
                 copter.g2.drone_show_manager.get_desired_velocity_neu_in_cms_per_seconds_at_seconds(elapsed, vel);
                 vel *= gain;
             }
+
+            // Prevent invalid velocity information from leaking into the guided
+            // mode controller
+            if (vel.is_nan() || vel.is_inf())
+            {
+                if (!invalid_velocity_warning_sent)
+                {
+                    gcs().send_text(MAV_SEVERITY_WARNING, "Invalid velocity command; using zero");
+                    invalid_velocity_warning_sent = true;
+                }
+                vel.zero();
+            }
+        }
+
+        if (copter.g2.drone_show_manager.is_acceleration_control_enabled())
+        {
+            copter.g2.drone_show_manager.get_desired_acceleration_neu_in_cms_per_seconds_squared_at_seconds(elapsed, acc);
+
+            // Prevent invalid acceleration information from leaking into the guided
+            // mode controller
+            if (acc.is_nan() || acc.is_inf())
+            {
+                if (!invalid_acceleration_warning_sent)
+                {
+                    gcs().send_text(MAV_SEVERITY_WARNING, "Invalid acceleration command; using zero");
+                    invalid_acceleration_warning_sent = true;
+                }
+                acc.zero();
+            }
+        }
+
+        // Prevent invalid position information from leaking into the guided
+        // mode controller
+        if (pos.is_nan() || pos.is_inf())
+        {
+            return false;
         }
 
         // copter.mode_guided.set_destination() is for waypoint-based control.
         // Position control is achieved on our side by clearing the velocity
         // feed-forward terms to zero.
-        copter.mode_guided.set_destination_posvel(pos, vel);
+        copter.mode_guided.set_destination_posvelaccel(pos, vel, acc);
 
         return true;
     }

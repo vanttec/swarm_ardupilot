@@ -40,7 +40,8 @@ enum DroneShowModeStage {
 
 // Enum representing the flags in the control mode bitmasp
 enum DroneShowControlModeFlag {
-    DroneShowControl_VelocityControlEnabled = 1
+    DroneShowControl_VelocityControlEnabled = 1,
+    DroneShowControl_AccelerationControlEnabled = 2,
 };
 
 // Flags representing various failures in drone show specific preflight checks.
@@ -306,7 +307,14 @@ public:
     // otherwise it returns false unconditionally.
     bool is_prepared_to_take_off() const;
 
-    // Returns whether the velocity control mode is enabled
+    // Returns whether we are feeding desired acceleration information into the
+    // lower-level position controller of ArduPilot
+    bool is_acceleration_control_enabled() const {
+        return _params.control_mode_flags & DroneShowControl_AccelerationControlEnabled;
+    }
+
+    // Returns whether we are feeding desired velocity information into the
+    // lower-level position controller of ArduPilot
     bool is_velocity_control_enabled() const {
         return _params.control_mode_flags & DroneShowControl_VelocityControlEnabled;
     }
