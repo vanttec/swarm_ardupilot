@@ -184,8 +184,13 @@ public:
 
     // Returns the desired velocity of the drone during the drone show the
     // given number of seconds after the start time, in the global NEU
-    // cooordinate system, using centimeters as units.
+    // cooordinate system, using centimeters per seconds as units.
     void get_desired_velocity_neu_in_cms_per_seconds_at_seconds(float time, Vector3f& vel);
+
+    // Returns the desired acceleration of the drone during the drone show the
+    // given number of seconds after the start time, in the global NEU
+    // cooordinate system, using centimeters per seconds squared as units.
+    void get_desired_acceleration_neu_in_cms_per_seconds_squared_at_seconds(float time, Vector3f& acc);
 
     // Retrieves the position where the drone is supposed to be at the start of the show.
     // Returns true if successful or false if the show coordinate system was not set up

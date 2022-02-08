@@ -467,6 +467,26 @@ void AC_DroneShowManager::get_desired_velocity_neu_in_cms_per_seconds_at_seconds
     vel.z = vec.z / 10.0f;
 }
 
+void AC_DroneShowManager::get_desired_acceleration_neu_in_cms_per_seconds_squared_at_seconds(float time, Vector3f& acc)
+{
+    sb_vector3_with_yaw_t vec;
+    float acc_north, acc_east;
+    float orientation_rad = _show_coordinate_system.orientation_rad;
+
+    sb_trajectory_player_get_acceleration_at(_trajectory_player, time, &vec);
+
+    // We need to rotate the X axis by -_orientation_rad degrees so it
+    // points North. At the same time, we also flip the Y axis so it points
+    // East and not West.
+    acc_north = cosf(orientation_rad) * vec.x + sinf(orientation_rad) * vec.y;
+    acc_east = sinf(orientation_rad) * vec.x - cosf(orientation_rad) * vec.y;
+
+    // We have mm/s/s so far, need to convert to cm/s/s
+    acc.x = acc_north / 10.0f;
+    acc.y = acc_east / 10.0f;
+    acc.z = vec.z / 10.0f;
+}
+
 // returns the elapsed time since the start of the show, in microseconds
 int64_t AC_DroneShowManager::get_elapsed_time_since_start_usec() const
 {
