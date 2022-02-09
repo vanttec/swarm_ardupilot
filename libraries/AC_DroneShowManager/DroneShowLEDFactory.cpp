@@ -50,13 +50,6 @@ DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(
 
         case DroneShowLEDType_NeoPixel:
             result = new DroneShowLED_SerialLED(DroneShowLED_SerialLEDType_NeoPixel, channel, num_leds);
-
-            // Hack for the Luminousbee 5: for some reason, it needs each LED color
-            // setting command to be repeated twice. We detect Luminousbee 5 from
-            // the fact that num_leds >= 20;
-            if (num_leds >= 20) {
-                result->set_repeat_count(2);
-            }
             break;
 
         case DroneShowLEDType_ProfiLED:
