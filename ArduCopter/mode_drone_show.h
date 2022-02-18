@@ -96,6 +96,14 @@ private:
     // have attempted to arm the drone recently
     uint32_t _prevent_arming_until_msec;
 
+    // Flag that stores whether the drone is limited to move only above the
+    // takeoff altitude. The flag is set when entering the "performing" stage;
+    // the limitation is relaxed when the real trajectory of the drone rises
+    // above this altitude. The role of this limitation is to prevent the drone
+    // from temporarily sinking below the takeoff altitude when the "real"
+    // takeoff in the show trajectory is slower.
+    bool _altitude_locked_above_takeoff_altitude;
+
     // Sets the stage of the execution to the given value
     void _set_stage(DroneShowModeStage value);
 

@@ -925,6 +925,38 @@ bool ModeDroneShow::send_guided_mode_command_during_performance()
             }
         }
 
+        // Prevent the drone from temporarily sinking below the takeoff altitude
+        // if the "real" trajectory has a slow takeoff
+        if (_altitude_locked_above_takeoff_altitude) {
+            int32_t target_altitude_above_home_cm;
+            int32_t takeoff_altitude_cm;
+
+            if (loc.get_alt_cm(Location::AltFrame::ABOVE_HOME, target_altitude_above_home_cm)) {
+                takeoff_altitude_cm = copter.g2.drone_show_manager.get_takeoff_altitude_cm();
+                if (target_altitude_above_home_cm < takeoff_altitude_cm) {
+                    // clamp the position to the target altitude, and zero out
+                    // the Z component of the velocity and the acceleration
+                    loc.set_alt_cm(takeoff_altitude_cm, Location::AltFrame::ABOVE_HOME);
+                    if (loc.get_vector_from_origin_NEU(pos)) {
+                        vel.z = 0;
+                        acc.z = 0;
+                    } else {
+                        // this should not happen either, but let's handle this
+                        // gracefully
+                        _altitude_locked_above_takeoff_altitude = false;
+                    }
+                } else {
+                    // we want to go above the takeoff altitude so we can
+                    // release the lock
+                    _altitude_locked_above_takeoff_altitude = false;
+                }
+            } else {
+                // let's not blow up if get_alt_cm() fails, it's not mission-critical,
+                // just release the lock
+                _altitude_locked_above_takeoff_altitude = false;
+            }
+        }
+
         // Prevent invalid position information from leaking into the guided
         // mode controller
         if (pos.is_nan() || pos.is_inf())
@@ -994,5 +1026,8 @@ void ModeDroneShow::_set_stage(DroneShowModeStage value)
 {
     _stage = value;
     _last_stage_change_at = AP_HAL::millis();
+
+    _altitude_locked_above_takeoff_altitude = (_stage == DroneShowModeStage::DroneShow_Performing);
+
     copter.g2.drone_show_manager.notify_drone_show_mode_entered_stage(_stage);
 }
