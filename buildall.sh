@@ -7,19 +7,17 @@
 # cmcopter -- for our own drones, which need a hack in the parsing of the PPMSum signals
 # CubeBlack -- for Sparkl One
 # entron300 -- for the Entron 300, which is a Pixhawk1 with some special hacks to fix the GPS autoconfig issue
-# fmuv2 -- for droneshow.mx
-# fmuv3 -- for Jose Muxi
-# fmuv4 -- for FlyFire
-# fmuv5 -- for the Holybro Pixhawk 4
+# fmuv2, fmuv3, fmuv4, fmuv5 -- generic builds for Pixhawk FMU designs
+# Pixhawk4 -- for the Holybro Pixhawk 4 (fmuv5 with a few tweaks)
 # PH4-mini -- for the PixHawk 4 Mini
+# Durandal -- for the Holybro Durandal
 # luminuousbee5 -- for LuminousBee5 outdoor
 # luminuousbee-mini2 -- for LuminousBee Mini indoor
-# CUAVv5Nano -- for jonathangentile.it
 #
 # You may define the BOARDS= variable in the environment to override which
 # boards to build for.
 
-BOARDS=${BOARDS:-"sitl Pixhawk1 cmcopter CubeBlack entron300 fmuv3 fmuv4 fmuv5 PH4-mini luminousbee-mini2 luminousbee5"}
+BOARDS=${BOARDS:-"sitl Pixhawk1 cmcopter CubeBlack entron300 fmuv3 fmuv4 fmuv5 Pixhawk4 PH4-mini Durandal luminousbee5"}
 ARM_TOOLCHAIN=${ARM_TOOLCHAIN:-"${HOME}/opt/toolchains/ardupilot"}
 
 set -e
