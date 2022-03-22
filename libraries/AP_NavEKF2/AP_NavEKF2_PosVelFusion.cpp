@@ -998,7 +998,7 @@ void NavEKF2_core::selectHeightForFusion()
             if (frontend->_altSource == 0) {
                 activeHgtSource = HGT_SOURCE_BARO;
             } else if (frontend->_altSource == 2) {
-                activeHgtSource = HGT_SOURCE_GPS;
+                activeHgtSource = gpsAccuracyGoodForAltitude ? HGT_SOURCE_GPS : HGT_SOURCE_BARO;
             }
         } else if (belowLowerSwHgt && trustTerrain && (prevTnb.c.z >= 0.7f)) {
             // reliable terrain and range finder so start using range finder height
