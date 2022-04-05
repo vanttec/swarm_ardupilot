@@ -379,6 +379,7 @@ void ModeDroneShow::wait_for_start_time_run()
                 // Update our home to the current location so we have zero AGL
                 if (!try_to_update_home_position()) {
                     gcs().send_text(MAV_SEVERITY_CRITICAL, "Could not set home position, giving up");
+                    AP::logger().Write_Error(LogErrorSubsystem::NAVIGATION, LogErrorCode::FAILED_TO_INITIALISE);
                     error_start();
                 } else {
                     _home_position_set = true;
@@ -406,6 +407,8 @@ void ModeDroneShow::wait_for_start_time_run()
                         _motors_started = true;
                     }
                 } else {
+                    gcs().send_text(MAV_SEVERITY_CRITICAL, "Failed to start motors, giving up");
+                    AP::logger().Write_Error(LogErrorSubsystem::NAVIGATION, LogErrorCode::FAILED_TO_INITIALISE);
                     error_start();
                 }
             }
@@ -443,6 +446,7 @@ void ModeDroneShow::takeoff_start()
         // This should not happen, but nevertheless let's move to the
         // error state if we don't know where we are
         gcs().send_text(MAV_SEVERITY_CRITICAL, "Failed to take off, no known location");
+        AP::logger().Write_Error(LogErrorSubsystem::NAVIGATION, LogErrorCode::FAILED_TO_INITIALISE);
         error_start();
         return;
     }
@@ -453,6 +457,7 @@ void ModeDroneShow::takeoff_start()
     // configured)
     if (!copter.g2.drone_show_manager.notify_takeoff_attempt())
     {
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Takeoff cancelled by show manager");
         AP::logger().Write_Error(LogErrorSubsystem::NAVIGATION, LogErrorCode::FAILED_TO_INITIALISE);
         error_start();
         return;
@@ -461,6 +466,7 @@ void ModeDroneShow::takeoff_start()
     // get current altitude above home because the home is not necessarily at
     // the place where we are currently taking off
     if (!current_loc.get_alt_cm(Location::AltFrame::ABOVE_HOME, current_alt)) {
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Failed to get current altitude above home");
         AP::logger().Write_Error(LogErrorSubsystem::NAVIGATION, LogErrorCode::FAILED_TO_SET_DESTINATION);
         error_start();
         return;
@@ -483,6 +489,7 @@ void ModeDroneShow::takeoff_start()
     // gcs().send_text(MAV_SEVERITY_INFO, "Takeoff target set to %ld %ld %ld", (long int)target_loc.lat, (long int)target_loc.lng, (long int)target_loc.alt);
 
     if (!wp_nav->set_wp_destination_loc(target_loc)) {
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Failed to set takeoff altitude in AGL");
         AP::logger().Write_Error(LogErrorSubsystem::NAVIGATION, LogErrorCode::FAILED_TO_SET_DESTINATION);
         error_start();
         return;
@@ -530,6 +537,7 @@ void ModeDroneShow::takeoff_run()
     } else if (!motors->armed()) {
         // if the motors are not armed any more, something is wrong so move to the
         // error stage. This typically happens if we crash during takeoff.
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Motors disarmed during takeoff");
         error_start();
     } else if (takeoff_completed()) {
         // if the takeoff has finished, move to the next stage
@@ -655,6 +663,7 @@ void ModeDroneShow::performing_run()
     } else if (!motors->armed()) {
         // if the motors are not armed any more, something is wrong so move to the
         // error stage. This typically happens if we crash during a show.
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Motors disarmed during show");
         error_start();
     } else if (performing_completed()) {
         // if we have finished the show, land
