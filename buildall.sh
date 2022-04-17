@@ -30,7 +30,7 @@ mkdir -p dist/
 if [ ! -d .venv ]; then
     python3 -m venv .venv
     .venv/bin/pip install -U pip wheel
-    .venv/bin/pip install future empy
+    .venv/bin/pip install future empy intelhex
 fi
 
 export PATH=".venv/bin:$PATH"
@@ -51,6 +51,8 @@ if [ -d "${ARM_TOOLCHAIN}" ]; then
 fi
 
 DATE=`date +%Y%m%d`
+
+source .venv/bin/activate
 
 for BOARD in $BOARDS; do
     BOARD_LOWER=`echo $BOARD | tr [[:upper:]] [[:lower:]]`
