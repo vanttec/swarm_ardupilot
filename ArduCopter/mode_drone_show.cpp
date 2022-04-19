@@ -572,7 +572,47 @@ bool ModeDroneShow::takeoff_completed() const
 {
     if (_stage == DroneShow_Takeoff) {
         if (_next_stage_after_takeoff == DroneShow_Performing) {
-            return wp_nav->reached_wp_destination();
+            /* Next step will start following the show trajectory. We can safely
+             * enter that stage if we have reached 70% of our takeoff altitude
+             * _and_ the desired altitude of the show trajectory at that time
+             * is above the takeoff altitude to prevent temporarily stopping the
+             * drone at the takeoff altitude */
+            Location loc;
+            int32_t altitude_above_home_cm;
+            int32_t desired_altitude_above_home_cm;
+            AC_DroneShowManager* show_manager = &copter.g2.drone_show_manager;
+
+            if (
+                show_manager->get_current_location(loc) &&
+                loc.get_alt_cm(Location::AltFrame::ABOVE_HOME, altitude_above_home_cm)
+            )
+            {
+                if (altitude_above_home_cm >= 0.7 * show_manager->get_takeoff_altitude_cm())
+                {
+                    // Altitude above home seems high enough, but is the trajectory
+                    // already ahead of us?
+                    float elapsed = show_manager->get_elapsed_time_since_start_sec();
+                    show_manager->get_desired_global_position_at_seconds(elapsed, loc);
+                    if (loc.get_alt_cm(Location::AltFrame::ABOVE_HOME, desired_altitude_above_home_cm))
+                    {
+                        return desired_altitude_above_home_cm >= altitude_above_home_cm;
+                    }
+                    else
+                    {
+                        // This should not happen either, especially because we've already been
+                        // through a successfull call to loc.get_alt_cm() if we managed to get
+                        // here.
+                        return false;
+                    }
+                }
+            }
+            else
+            {
+                // This should not happen; it usually means that we do not have an
+                // EKF origin yet. The safest is to return false so we do not
+                // proceed to the "performing" phase with this error.
+                return false;
+            }
         } else {
             /* This branch belongs to the case when we will either start
              * loitering after takeoff, or we will land immediately. In both
