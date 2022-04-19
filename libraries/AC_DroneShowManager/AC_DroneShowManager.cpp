@@ -1430,7 +1430,7 @@ bool AC_DroneShowManager::_is_at_takeoff_position() const
         return false;
     }
 
-    if (!_get_current_location(current_loc))
+    if (!get_current_location(current_loc))
     {
         // EKF does not know its own position yet so we report that we are not
         // at the takeoff position as it would not be safe to take off anyway

@@ -180,6 +180,9 @@ public:
     // during the execution of the show.
     uint32_t get_controller_update_delta_msec() const { return _controller_update_delta_msec; }
 
+    // Retrieves the current location of the vehicle from the EKF
+    virtual bool get_current_location(Location& loc) const { return false; }
+
     // Returns the desired position of the drone during the drone show the
     // given number of seconds after the start time, in the global coordinate
     // system, using centimeters as units.
@@ -615,9 +618,6 @@ private:
 
     // Flashes the LEDs of the drone with the given color
     void _flash_leds_with_color(uint8_t red, uint8_t green, uint8_t blue, uint8_t count, LightEffectPriority priority);
-
-    // Retrieves the current location of the vehicle from the EKF
-    virtual bool _get_current_location(Location& loc) const { return false; }
 
     // Returns a timestamp meant to be used solely for the purposes of implementing
     // light signals. The timestamp is synced to GPS seconds when the drone has

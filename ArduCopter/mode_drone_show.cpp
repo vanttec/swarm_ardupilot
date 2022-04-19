@@ -6,7 +6,7 @@
  * Implementation of drone show flight mode
  */
 
-bool AC_DroneShowManager_Copter::_get_current_location(Location& loc) const
+bool AC_DroneShowManager_Copter::get_current_location(Location& loc) const
 {
     return copter.ahrs.get_location(loc);
 }
