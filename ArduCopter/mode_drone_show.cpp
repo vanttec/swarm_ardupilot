@@ -522,7 +522,6 @@ void ModeDroneShow::takeoff_start()
 void ModeDroneShow::takeoff_run()
 {
     bool completed = false;
-    bool timed_out = false;
 
     // make sure that the yaw target is still our current heading. Something
     // overwrites it in the ArduCopter code during takeoff but I could not
@@ -542,11 +541,6 @@ void ModeDroneShow::takeoff_run()
     } else if (takeoff_completed()) {
         // if the takeoff has finished, move to the next stage
         completed = true;
-    } else if (takeoff_timed_out()) {
-        // if the takeoff takes too long, move to the next stage anyway after
-        // emitting a warning
-        completed = true;
-        timed_out = true;
     }
 
     if (completed) {
@@ -564,9 +558,6 @@ void ModeDroneShow::takeoff_run()
                 break;
 
             default:
-                if (timed_out) {
-                    gcs().send_text(MAV_SEVERITY_WARNING, "Takeoff took too long");
-                }
                 performing_start();
         }
 
@@ -580,12 +571,12 @@ void ModeDroneShow::takeoff_run()
 bool ModeDroneShow::takeoff_completed() const
 {
     if (_stage == DroneShow_Takeoff) {
-        if (
-            _next_stage_after_takeoff == DroneShow_Loiter ||
-            _next_stage_after_takeoff == DroneShow_Landing ||
-            _next_stage_after_takeoff == DroneShow_Landed
-        ) {
-            /* ensure that we spend at least ten seconds with taking off.
+        if (_next_stage_after_takeoff == DroneShow_Performing) {
+            return wp_nav->reached_wp_destination();
+        } else {
+            /* This branch belongs to the case when we will either start
+             * loitering after takeoff, or we will land immediately. In both
+             * cases, ensure that we spend at least ten seconds with taking off.
              * This is needed because wp_nav->reached_wp_destination() will
              * trigger as soon as we are within WPNAV_RADIUS of the target
              * altitude, and switching to loitering immediately will mean that
@@ -594,8 +585,6 @@ bool ModeDroneShow::takeoff_completed() const
              * loiter mode while also specifying a target altitude to loiter at
              */
             return wp_nav->reached_wp_destination() && takeoff_timed_out();
-        } else {
-            return wp_nav->reached_wp_destination();
         }
     } else if (_stage >= DroneShow_Performing && _stage <= DroneShow_Landed) {
         return true;
