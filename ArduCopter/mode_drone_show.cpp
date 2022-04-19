@@ -605,6 +605,12 @@ bool ModeDroneShow::takeoff_completed() const
                         return false;
                     }
                 }
+                else
+                {
+                    // We are above 70% of the takeoff altitude but the trajectory
+                    // is behind so wait until it catches up
+                    return false;
+                }
             }
             else
             {
