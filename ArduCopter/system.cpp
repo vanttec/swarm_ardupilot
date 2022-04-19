@@ -208,7 +208,7 @@ void Copter::init_ardupilot()
 
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
     // initialise drone show subsystem
-    g2.drone_show_manager.init();
+    g2.drone_show_manager.init(wp_nav);
 #endif
 
     enum Mode::Number initial_mode = (enum Mode::Number)g.initial_mode.get();

@@ -9,6 +9,8 @@
 #include <AP_Notify/RGBLed.h>
 #include <AP_Param/AP_Param.h>
 
+#include <AC_WPNav/AC_WPNav.h>
+
 #include <skybrush/colors.h>
 
 struct sb_trajectory_s;
@@ -145,7 +147,7 @@ public:
     void early_init();
 
     // Initializes the drone show subsystem at boot time
-    void init();
+    void init(const AC_WPNav* wp_nav);
 
     // Returns whether the user has asked the drone show manager to cancel the
     // show as soon as possible. This flag is checked regularly from
@@ -236,6 +238,16 @@ public:
 
     // Returns the altitude to take off to above the current position of the drone, in centimeters
     int32_t get_takeoff_altitude_cm() const { return _params.takeoff_altitude_m * 100.0f; }
+
+    // Returns the takeoff speed in meters per second
+    float get_takeoff_speed_m_s() const {
+        float result = _wp_nav ? _wp_nav->get_default_speed_up() : 0;
+        if (result <= 0) {
+            /* safety check */
+            result = DEFAULT_TAKEOFF_SPEED_METERS_PER_SEC;
+        }
+        return result;
+    }
 
     // Returns the number of seconds left until show start, in microseconds
     int64_t get_time_until_start_usec() const;
@@ -388,8 +400,9 @@ public:
 
     static const struct AP_Param::GroupInfo var_info[];
 
-    // Takeoff speed; the drone attempts to take off with this vertical speed
-    static constexpr float TAKEOFF_SPEED_METERS_PER_SEC = 1.0f;
+    // Takeoff speed; we assume that the drone attempts to take off with this
+    // vertical speed if WPNAV_SPEED_UP seems invalid
+    static constexpr float DEFAULT_TAKEOFF_SPEED_METERS_PER_SEC = 1.0f;
 
     // Landing altitude; the drone attempts to navigate to this altitude before
     // starting landing at the end
@@ -562,6 +575,9 @@ private:
     // two bits of this value regularly in status packets to allow the GCS to
     // detect when the drone was rebooted
     uint16_t _boot_count;
+
+    // Reference to the waypoint navigation module so we can query the takeoff parameters
+    const AC_WPNav* _wp_nav;
 
     // Checks whether there were any changes in the parameters relevant to the
     // execution of the drone show. This has to be called regularly from update()

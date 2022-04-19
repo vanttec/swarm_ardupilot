@@ -585,7 +585,7 @@ bool ModeDroneShow::takeoff_completed() const
             _next_stage_after_takeoff == DroneShow_Landing ||
             _next_stage_after_takeoff == DroneShow_Landed
         ) {
-            /* ensure that we spend at least five seconds with taking off.
+            /* ensure that we spend at least ten seconds with taking off.
              * This is needed because wp_nav->reached_wp_destination() will
              * trigger as soon as we are within WPNAV_RADIUS of the target
              * altitude, and switching to loitering immediately will mean that

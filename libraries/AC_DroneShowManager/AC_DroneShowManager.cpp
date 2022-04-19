@@ -364,7 +364,7 @@ void AC_DroneShowManager::early_init()
     }
 }
 
-void AC_DroneShowManager::init()
+void AC_DroneShowManager::init(const AC_WPNav* wp_nav)
 {
     // Get the boot count from the parameters
     enum ap_var_type ptype;
@@ -373,6 +373,9 @@ void AC_DroneShowManager::init()
 
     // Get a reference to the RGB LED factory
     _rgb_led_factory = &_rgb_led_factory_singleton;
+
+    // Store a reference to wp_nav so we can ask what the takeoff speed will be
+    _wp_nav = wp_nav;
 
     // Clear start time and authorization now; at this point the parameter
     // subsystem has already loaded back the previous value from the EEPROM so
@@ -1619,7 +1622,7 @@ void AC_DroneShowManager::_recalculate_trajectory_properties()
 
     _takeoff_time_sec = sb_trajectory_propose_takeoff_time_sec(
         _trajectory, get_takeoff_altitude_cm() * 10.0f /* [mm] */,
-        AC_DroneShowManager::TAKEOFF_SPEED_METERS_PER_SEC * 1000.0f /* [mm/s] */
+        get_takeoff_speed_m_s() * 1000.0f /* [mm/s] */
     );
 
     /* We assume that we need to trigger landing at the end of the trajectory;
