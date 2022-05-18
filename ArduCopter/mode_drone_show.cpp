@@ -334,8 +334,8 @@ void ModeDroneShow::wait_for_start_time_run()
     const float latest_takeoff_attempt_after_scheduled_takeoff_time_in_seconds = 5.0f;
 
     // Drone is in standby so keep all I terms in controllers at zero
-    attitude_control->reset_rate_controller_I_terms();
     attitude_control->reset_yaw_target_and_rate();
+    attitude_control->reset_rate_controller_I_terms();
     pos_control->standby_xyz_reset();
 
     // This is copied from ModeStabilize::run() -- it is needed to allow the 
@@ -491,8 +491,10 @@ void ModeDroneShow::takeoff_start()
     // initialise alt for WP_NAVALT_MIN and set completion alt
     auto_takeoff_start(target_alt, /* terrain_alt = */ false);
 
-    // make sure that the yaw target is our current heading
+    // make sure that the yaw target is our current heading and there are no I terms
+    // in the attitude control rate controller
     attitude_control->reset_yaw_target_and_rate();
+    attitude_control->reset_rate_controller_I_terms();
 
     // pretend that we were armed by the user by raising the throttle; the auto
     // takeoff routine won't work without this.
@@ -505,11 +507,6 @@ void ModeDroneShow::takeoff_start()
 void ModeDroneShow::takeoff_run()
 {
     bool completed = false;
-
-    // make sure that the yaw target is still our current heading. Something
-    // overwrites it in the ArduCopter code during takeoff but I could not
-    // find the culprit so far.
-    attitude_control->reset_yaw_target_and_rate();
 
     auto_takeoff_run();
 
