@@ -170,7 +170,10 @@
 #endif
 
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
-#include "mode_drone_show.h"
+ #include "mode_drone_show.h"
+ #if AC_FENCE == ENABLED
+  #include <AC_HardFence/AC_HardFence.h>
+ #endif
 #endif
 
 #if COLLMOT_EXTENSIONS_ENABLED == ENABLED
@@ -824,6 +827,9 @@ private:
 
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
     void Log_Write_DroneShowStatus();
+ #if AC_FENCE == ENABLED
+    void hard_fence_check();
+ #endif
 #endif
 
     // mode.cpp

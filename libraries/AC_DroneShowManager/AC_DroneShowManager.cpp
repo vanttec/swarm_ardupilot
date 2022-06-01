@@ -879,6 +879,13 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
     if (uses_gps_time_for_show_start() && !_is_gps_time_ok()) {
         flags |= (1 << 1);
     }
+    if (AP::fence()->get_breaches()) {
+        /* this bit is sent because ArduCopter's SYS_STATUS message does not
+         * mark the fence as "enabled and not healthy" when FENCE_ACTION is
+         * set to zero, so the GCS would not be notified about fence breaches
+         * if we only looked at SYS_STATUS */
+        flags |= (1 << 0);
+    }
 
     /* calculate second byte of status flags */
     flags2 = _preflight_check_failures & 0xf0;

@@ -10,6 +10,10 @@
 #if MODE_FOLLOW_ENABLED == ENABLED
  # include <AP_Follow/AP_Follow.h>
 #endif
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+ # include <AC_DroneShowManager/AC_DroneShowManager.h>
+ # include <AC_HardFence/AC_HardFence.h>
+#endif
 
 // Global parameter class.
 //
@@ -655,6 +659,7 @@ public:
     // we need a pointer to the mode for the G2 table
     void *mode_drone_show_ptr;
     AC_DroneShowManager_Copter drone_show_manager;
+    AC_HardFence hard_fence;
 #endif
 };
 
