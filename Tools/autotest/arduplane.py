@@ -590,6 +590,7 @@ class AutoTestPlane(AutoTest):
         self.disarm_wait(timeout=120)
 
         self.progress("Flying home")
+        self.set_current_waypoint(0, check_afterwards=False)
         self.takeoff(10)
         self.set_parameter("LAND_TYPE", 0)
         self.fly_home_land_and_disarm()
@@ -614,8 +615,10 @@ class AutoTestPlane(AutoTest):
         self.wait_servo_channel_value(2, deepstall_elevator_pwm)
 
         self.disarm_wait(timeout=120)
+        self.set_current_waypoint(0, check_afterwards=False)
 
         self.progress("Flying home")
+        self.set_current_waypoint(0, check_afterwards=False)
         self.takeoff(100)
         self.set_parameter("LAND_TYPE", 0)
         self.fly_home_land_and_disarm(timeout=240)
@@ -1773,6 +1776,8 @@ class AutoTestPlane(AutoTest):
             )
 
         self.fly_home_land_and_disarm()
+        self.set_current_waypoint(0, check_afterwards=False)
+
         self.change_mode("MANUAL")
         self.set_rc(3, 1000)
 
