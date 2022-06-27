@@ -80,6 +80,10 @@
 #endif
 #include <AP_GPS/AP_GPS.h>
 
+#if HAVE_FILESYSTEM_SUPPORT
+  #include <AP_Filesystem/AP_Filesystem.h>
+#endif
+
 #include <ctype.h>
 
 extern const AP_HAL::HAL& hal;
@@ -4743,7 +4747,11 @@ MAV_RESULT GCS_MAVLINK::handle_command_int_packet(const mavlink_command_int_t &p
             !is_equal(packet.param2, 1.0f)) {
             return MAV_RESULT_UNSUPPORTED;
         }
+#if HAVE_FILESYSTEM_SUPPORT
         return AP::FS().format() ? MAV_RESULT_ACCEPTED : MAV_RESULT_FAILED;
+#else
+        return MAV_RESULT_UNSUPPORTED;
+#endif
     }
 
 #if AP_SCRIPTING_ENABLED
