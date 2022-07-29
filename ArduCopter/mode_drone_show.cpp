@@ -2,6 +2,8 @@
 
 #include <skybrush/colors.h>
 
+#if MODE_GUIDED_ENABLED == ENABLED
+
 /*
  * Implementation of drone show flight mode
  */
@@ -1081,3 +1083,9 @@ void ModeDroneShow::_set_stage(DroneShowModeStage value)
 
     copter.g2.drone_show_manager.notify_drone_show_mode_entered_stage(_stage);
 }
+
+#else
+
+#error "You need to enable guided mode support to use the drone show mode."
+
+#endif
