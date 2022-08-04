@@ -670,7 +670,7 @@ void ModeDroneShow::performing_start()
     // gcs().send_text(MAV_SEVERITY_INFO, "Starting show");
 }
 
-// performs the takeoff stage
+// executes the show performance
 void ModeDroneShow::performing_run()
 {
     static uint32_t last_guided_command = 0;
@@ -823,7 +823,8 @@ void ModeDroneShow::loiter_start()
     // gcs().send_text(MAV_SEVERITY_INFO, "Holding position");
 }
 
-// performs the return to landing position stage
+// performs the phase where we are holding our position indefinitely; this happens
+// when we exited show mode and then entered it again while in the air
 void ModeDroneShow::loiter_run()
 {
     // call regular position hold flight mode run function
