@@ -137,7 +137,7 @@ public:
     enum StartTimeSource {
         NONE = 0,         // No start time was set
         PARAMETER = 1,    // start time was set by the user via the START_TIME parameter
-        START_METHOD = 2, // start time was set by calling the schedule_delayed_start() method
+        START_METHOD = 2, // start time was set by calling the schedule_delayed_start_after() method
         RC_SWITCH = 3     // start time was set via the RC switch action
     };
 
@@ -153,6 +153,13 @@ public:
     // show as soon as possible. This flag is checked regularly from
     // mode_drone_show.cpp
     bool cancel_requested() const { return _cancel_requested; }
+
+    // Clears the scheduled time for a collective RTL maneuver. Returns whether
+    // the request was processed.
+    //
+    // This function is a no-op if the drone show is not in the "performing"
+    // phase and 'force' is set to false.
+    bool clear_scheduled_collective_rtl(bool force = false);
 
     // Clears the scheduled start time of the show (but does not cancel the
     // show if it is already running). Returns whether the request was
@@ -281,6 +288,11 @@ public:
     // remote controller.
     void handle_rc_start_switch();
 
+    // Asks the drone show manager to schedule a collective RTH operation if
+    // the show is running, assuming that the signal was sent from the remote
+    // controller.
+    void handle_rc_collective_rtl_switch();
+
     // Returns whether the drone has been authorized to start automatically by the user
     bool has_authorization_to_start() const;
 
@@ -367,6 +379,14 @@ public:
     // there was an IO error.
     bool reload_show_from_storage() WARN_IF_UNUSED;
 
+    // Asks the drone show manager to schedule the start of a collective RTL
+    // maneuver at the given timestamp. Returns whether the CRTL maneuver was
+    // scheduled successfully.
+    //
+    // This function is a no-op if the drone show is not in the "performing"
+    // phase.
+    bool schedule_collective_rtl_at_show_timestamp_msec(uint32_t timestamp_ms);
+
     // Asks the drone show manager to schedule a start as soon as possible if
     // the show is not running yet. The delay parameter specifies the number of
     // milliseconds until the show start. It is the responsibility of the caller
@@ -375,7 +395,7 @@ public:
     //
     // This function is a no-op if the drone show is not in the "waiting for
     // start time" phase.
-    bool schedule_delayed_start(uint32_t delay_ms);
+    bool schedule_delayed_start_after(uint32_t delay_ms);
 
     // Sends a drone show status message (wrapped in a DATA16 packet) on the given MAVLink channel
     void send_drone_show_status(const mavlink_channel_t chan) const;
@@ -533,6 +553,10 @@ private:
     // Time when we need to land relative to the start of the show, in seconds
     float _landing_time_sec;
 
+    // Time when we need to start a coordinated RTL trajectory, relative to the
+    // start of the show, in seconds. Zero if unscheduled.
+    float _crtl_start_time_sec;
+
     // Time when the user requested a light signal, in milliseconds; zero if
     // no signal was requested.
     struct {
@@ -572,7 +596,7 @@ private:
     sb_rgb_color_t _last_rgb_led_color;
 
     // Timestamp that defines whether the RC start switch is blocked (and if so, until when)
-    uint32_t _rc_start_switch_blocked_until;
+    uint32_t _rc_switches_blocked_until;
 
     // Copy of the STAT_BOOTCNT parameter value at boot; we will send the lower
     // two bits of this value regularly in status packets to allow the GCS to
@@ -582,6 +606,9 @@ private:
     // Reference to the waypoint navigation module so we can query the takeoff parameters
     const AC_WPNav* _wp_nav;
 
+    // Returns whether the RC switches are currently blocked
+    bool _are_rc_switches_blocked();
+    
     // Checks whether there were any changes in the parameters relevant to the
     // execution of the drone show. This has to be called regularly from update()
     void _check_changes_in_parameters();

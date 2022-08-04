@@ -99,6 +99,7 @@ namespace Colors {
 
 namespace CustomPackets {
     static const uint8_t START_CONFIG = 1;
+    static const uint8_t CRTL_TRIGGER = 2;
 
     typedef struct PACKED {
         // Start time to set on the drone, in GPS time of week (sec). Anything
@@ -114,6 +115,14 @@ namespace CustomPackets {
             int32_t countdown_msec;
         } optional_part;
     } start_config_t;
+
+    typedef struct PACKED {
+        // Timestamp to trigger collective RTL at, relative to the show start,
+        // in seconds. Zero is a special value, it clears any scheduled
+        // collective RTL for the future if the drone has not started the
+        // CRTL trajectory yet.
+        uint16_t start_time;
+    } crtl_trigger_t;
 };
 
 const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
@@ -306,11 +315,12 @@ AC_DroneShowManager::AC_DroneShowManager() :
     _start_time_unix_usec(0),
     _takeoff_time_sec(0),
     _landing_time_sec(0),
+    _crtl_start_time_sec(0),
     _total_duration_sec(0),
     _cancel_requested(false),
     _controller_update_delta_msec(1000 / DEFAULT_UPDATE_RATE_HZ),
     _rgb_led(0),
-    _rc_start_switch_blocked_until(0),
+    _rc_switches_blocked_until(0),
     _boot_count(0)
 {
     AP_Param::setup_object_defaults(this, var_info);
@@ -781,6 +791,10 @@ void AC_DroneShowManager::notify_drone_show_mode_entered_stage(DroneShowModeStag
 
     _stage_in_drone_show_mode = stage;
 
+    // Whenever we change the state, we clear the scheduled start time of a
+    // collective RTL trajectory
+    clear_scheduled_collective_rtl(/* force = */ true);
+
     // Force-update preflight checks so we see the errors immediately if we
     // switched to the "waiting for start time" stage
     _update_preflight_check_result(/* force = */ true);
@@ -925,16 +939,15 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
 
 void AC_DroneShowManager::handle_rc_start_switch()
 {
-    if (_rc_start_switch_blocked_until && _rc_start_switch_blocked_until >= AP_HAL::millis())
+    if (_are_rc_switches_blocked())
     {
-        // The switch is ignored at the moment
         return;
     }
 
-    if (schedule_delayed_start(10000 /* msec */)) {
+    if (schedule_delayed_start_after(10000 /* msec */)) {
         // Rewrite the start time source to be "RC switch", not
         // "start method", even though we implemented it using
-        // the schedule_delayed_start() method
+        // the schedule_delayed_start_after() method
         if (_start_time_requested_by == StartTimeSource::START_METHOD) {
             _start_time_requested_by = StartTimeSource::RC_SWITCH;
         }
@@ -951,7 +964,7 @@ bool AC_DroneShowManager::should_switch_to_show_mode_when_authorized() const
     return _params.show_mode_settings & 2;
 }
 
-bool AC_DroneShowManager::schedule_delayed_start(uint32_t delay_ms)
+bool AC_DroneShowManager::schedule_delayed_start_after(uint32_t delay_ms)
 {
     bool success = false;
 
@@ -1004,6 +1017,11 @@ void AC_DroneShowManager::update()
     }
 
     main_cycle = !main_cycle;
+}
+
+bool AC_DroneShowManager::_are_rc_switches_blocked()
+{
+    return _rc_switches_blocked_until && _rc_switches_blocked_until >= AP_HAL::millis();
 }
 
 void AC_DroneShowManager::_check_changes_in_parameters()
@@ -1123,7 +1141,13 @@ void AC_DroneShowManager::_check_events()
 void AC_DroneShowManager::_check_radio_failsafe()
 {
     if (AP_Notify::flags.failsafe_radio) {
-        _rc_start_switch_blocked_until = AP_HAL::millis() + 1000;
+        // Block the handling of RC switches for the next second so we don't
+        // accidentally trigger a function if the user changes the state of the
+        // RC switch while we are not connected to the RC.
+        //
+        // (E.g., switch is low, drone triggers RC failsafe because it is out
+        // of range, user changes the switch, then the drone reconnects)
+        _rc_switches_blocked_until = AP_HAL::millis() + 1000;
     }
 }
 
@@ -1244,13 +1268,26 @@ bool AC_DroneShowManager::_handle_custom_data_message(uint8_t type, void* data, 
                     if (countdown_msec < -GPS_WEEK_LENGTH_MSEC) {
                         clear_scheduled_start_time();
                     } else if (countdown_msec >= 0 && countdown_msec < GPS_WEEK_LENGTH_MSEC) {
-                        schedule_delayed_start(countdown_msec);
+                        schedule_delayed_start_after(countdown_msec);
                     }
                 }
 
                 return true;
             }
             break;
+
+        // Schedule collective RTL
+        case CustomPackets::CRTL_TRIGGER:
+            if (length >= sizeof(CustomPackets::crtl_trigger_t)) {
+                CustomPackets::crtl_trigger_t* crtl_trigger = static_cast<CustomPackets::crtl_trigger_t*>(data);
+                if (crtl_trigger->start_time == 0) {
+                    clear_scheduled_collective_rtl();
+                } else if (crtl_trigger->start_time > 0) {
+                    schedule_collective_rtl_at_show_timestamp_msec(
+                        crtl_trigger->start_time * 1000 /* [s] --> [msec] */
+                    );
+                }
+            }
     }
 
     return false;
