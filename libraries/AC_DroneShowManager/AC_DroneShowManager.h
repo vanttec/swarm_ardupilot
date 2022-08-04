@@ -141,6 +141,15 @@ public:
         RC_SWITCH = 3     // start time was set via the RC switch action
     };
 
+    // Simple struct to contain a guided mode command that should be sent during
+    // performance
+    struct GuidedModeCommand {
+        Vector3f pos;
+        Vector3f vel;
+        Vector3f acc;
+        bool unlock_altitude;
+    };
+
     // Early initialization steps that have to be called early in the boot process
     // to ensure we have enough memory to do them even on low-memory boards like
     // a Pixhawk1
@@ -186,6 +195,13 @@ public:
     // Returns the preferred duration between consecutive guided mode commands
     // during the execution of the show.
     uint32_t get_controller_update_delta_msec() const { return _controller_update_delta_msec; }
+
+    // Returns the guided mode command that should be sent during the performance
+    // when the function is invoked
+    bool get_current_guided_mode_command_to_send(
+        GuidedModeCommand& command,
+        bool altitude_locked_above_takeoff_altitude = false
+    ) WARN_IF_UNUSED;
 
     // Retrieves the current location of the vehicle from the EKF
     virtual bool get_current_location(Location& loc) const { return false; }

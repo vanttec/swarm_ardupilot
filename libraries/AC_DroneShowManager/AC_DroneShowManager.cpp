@@ -453,6 +453,119 @@ void AC_DroneShowManager::get_color_of_rgb_light_at_seconds(float time, sb_rgb_c
     *color = sb_light_player_get_color_at(_light_player, time < 0 || time > 86400000 ? 0 : time * 1000);
 }
 
+bool AC_DroneShowManager::get_current_guided_mode_command_to_send(
+    GuidedModeCommand& command, bool altitude_locked_above_takeoff_altitude
+) {
+    Location loc;
+    static uint8_t invalid_velocity_warning_sent = 0;
+    static uint8_t invalid_acceleration_warning_sent = 0;
+    // static uint8_t counter = 0;
+
+    float elapsed = get_elapsed_time_since_start_sec();
+    
+    get_desired_global_position_at_seconds(elapsed, loc);
+
+    command.pos.zero();
+    command.vel.zero();
+    command.acc.zero();
+
+    if (loc.get_vector_from_origin_NEU(command.pos))
+    {
+        /*
+        counter++;
+        if (counter > 4) {
+            gcs().send_text(MAV_SEVERITY_INFO, "%.2f %.2f %.2f -- %.2f %.2f %.2f", pos.x, pos.y, pos.z, vel.x, vel.y, vel.z);
+        }
+        */
+
+        if (is_velocity_control_enabled())
+        {
+            float gain = get_velocity_feedforward_gain();
+
+            if (gain > 0)
+            {
+                get_desired_velocity_neu_in_cms_per_seconds_at_seconds(elapsed, command.vel);
+                command.vel *= gain;
+            }
+
+            // Prevent invalid velocity information from leaking into the guided
+            // mode controller
+            if (command.vel.is_nan() || command.vel.is_inf())
+            {
+                if (!invalid_velocity_warning_sent)
+                {
+                    gcs().send_text(MAV_SEVERITY_WARNING, "Invalid velocity command; using zero");
+                    invalid_velocity_warning_sent = true;
+                }
+                command.vel.zero();
+            }
+        }
+
+        if (is_acceleration_control_enabled())
+        {
+            get_desired_acceleration_neu_in_cms_per_seconds_squared_at_seconds(elapsed, command.acc);
+
+            // Prevent invalid acceleration information from leaking into the guided
+            // mode controller
+            if (command.acc.is_nan() || command.acc.is_inf())
+            {
+                if (!invalid_acceleration_warning_sent)
+                {
+                    gcs().send_text(MAV_SEVERITY_WARNING, "Invalid acceleration command; using zero");
+                    invalid_acceleration_warning_sent = true;
+                }
+                command.acc.zero();
+            }
+        }
+
+        // Prevent the drone from temporarily sinking below the takeoff altitude
+        // if the "real" trajectory has a slow takeoff
+        if (altitude_locked_above_takeoff_altitude) {
+            int32_t target_altitude_above_home_cm;
+            int32_t takeoff_altitude_cm;
+
+            if (loc.get_alt_cm(Location::AltFrame::ABOVE_HOME, target_altitude_above_home_cm)) {
+                takeoff_altitude_cm = get_takeoff_altitude_cm();
+                if (target_altitude_above_home_cm < takeoff_altitude_cm) {
+                    // clamp the position to the target altitude, and zero out
+                    // the Z component of the velocity and the acceleration
+                    loc.set_alt_cm(takeoff_altitude_cm, Location::AltFrame::ABOVE_HOME);
+                    if (loc.get_vector_from_origin_NEU(command.pos)) {
+                        command.vel.z = 0;
+                        command.acc.z = 0;
+                    } else {
+                        // this should not happen either, but let's handle this
+                        // gracefully
+                        command.unlock_altitude = true;
+                    }
+                } else {
+                    // we want to go above the takeoff altitude so we can
+                    // release the lock
+                    command.unlock_altitude = true;
+                }
+            } else {
+                // let's not blow up if get_alt_cm() fails, it's not mission-critical,
+                // just release the lock
+                command.unlock_altitude = true;
+            }
+        }
+
+        // Prevent invalid position information from leaking into the guided
+        // mode controller
+        if (command.pos.is_nan() || command.pos.is_inf())
+        {
+            return false;
+        }
+
+        return true;
+    }
+    else
+    {
+        // No EKF origin yet, this should not have happened
+        return false;
+    }
+}
+
 void AC_DroneShowManager::get_desired_global_position_at_seconds(float time, Location& loc)
 {
     sb_vector3_with_yaw_t vec;
