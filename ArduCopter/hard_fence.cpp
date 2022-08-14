@@ -22,7 +22,7 @@ void Copter::hard_fence_check()
     // fence.get_breach_distance() is not reliable as it does not include
     // polygon fences, so we don't use that. See AC_HardFence.cpp for the
     // logic, which does not require fence.get_breach_distance()
-    if (g2.hard_fence.notify_active_breaches(breaches)) {
+    if (g2.drone_show_manager.hard_fence.notify_active_breaches(breaches)) {
         // Module requested the motors to be stopped forcibly. Send a notification
         // first if we haven't done so recently.
         if (last_breach_notification_sent < AP_HAL::millis() - 5000) {

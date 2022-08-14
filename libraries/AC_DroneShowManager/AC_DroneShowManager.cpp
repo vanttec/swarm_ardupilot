@@ -279,7 +279,31 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @RebootRequired: True
     AP_GROUPINFO("SYNC_MODE", 18, AC_DroneShowManager, _params.time_sync_mode, DEFAULT_SYNC_MODE),
 
-    // Currently used max parameter ID: 19; update this if you add more parameters.
+    // @Param: HFENCE_EN
+    // @DisplayName: Hard fence enable/disable
+    // @Description: Allows you to enable (1) or disable (0) the hard fence functionality
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Standard
+    AP_GROUPINFO("HFENCE_EN", 20, AC_DroneShowManager, hard_fence._params.enabled, 0),
+
+    // @Param: HFENCE_DIST
+    // @DisplayName: Hard fence minimum distance
+    // @Description: Minimum distance that the hard fence extends beyond the standard geofence
+    // @Units: m
+    // @Range: 1 1000
+    // @User: Standard
+    AP_GROUPINFO("HFENCE_DIST", 21, AC_DroneShowManager, hard_fence._params.distance, 25),
+
+    // @Param: HFENCE_DLY
+    // @DisplayName: Hard fence timeout
+    // @Description: Minimum time that the vehicle needs to spend outside the hard geofence to trigger a motor shutdown
+    // @Units: sec
+    // @Range: 0 120
+    // @User: Standard
+    AP_GROUPINFO("HFENCE_TO", 22, AC_DroneShowManager, hard_fence._params.timeout, 5),
+
+    // Currently used max parameter ID: 22; update this if you add more parameters.
+    // Note that the max parameter ID may appear in the middle of the above list.
 
     AP_GROUPEND
 };
@@ -293,6 +317,7 @@ static float get_modulation_factor_for_light_effect(
 );
 
 AC_DroneShowManager::AC_DroneShowManager() :
+    hard_fence(),
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     _sock_rgb(true),
     _sock_rgb_open(false),

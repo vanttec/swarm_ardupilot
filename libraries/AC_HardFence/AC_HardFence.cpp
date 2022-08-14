@@ -1,37 +1,7 @@
 #include <AP_AHRS/AP_AHRS.h>
-#include <AP_Param/AP_Param.h>
 #include <GCS_MAVLink/GCS.h>
 
 #include "AC_HardFence.h"
-
-const AP_Param::GroupInfo AC_HardFence::var_info[] = {
-    // @Param: ENABLE
-    // @DisplayName: Hard fence enable/disable
-    // @Description: Allows you to enable (1) or disable (0) the hard fence functionality
-    // @Values: 0:Disabled,1:Enabled
-    // @User: Standard
-    AP_GROUPINFO("ENABLE", 1, AC_HardFence, _params.enabled, 0),
-
-    // @Param: DISTANCE
-    // @DisplayName: Hard fence minimum distance
-    // @Description: Minimum distance that the hard fence extends beyond the standard geofence
-    // @Units: m
-    // @Range: 1 1000
-    // @User: Standard
-    AP_GROUPINFO("DISTANCE", 2, AC_HardFence, _params.distance, 25),
-
-    // @Param: TIMEOUT
-    // @DisplayName: Hard fence timeout
-    // @Description: Minimum time that the vehicle needs to spend outside the hard geofence to trigger a motor shutdown
-    // @Units: sec
-    // @Range: 0 120
-    // @User: Standard
-    AP_GROUPINFO("TIMEOUT", 3, AC_HardFence, _params.timeout, 5),
-
-    // Currently used max parameter ID: 3; update this if you add more parameters.
-
-    AP_GROUPEND
-};
 
 AC_HardFence::AC_HardFence() :
     _state(BreachState::NONE),
@@ -40,7 +10,6 @@ AC_HardFence::AC_HardFence() :
     _current_breach_point_valid(false),
     _current_distance_from_fence(0)
 {
-    AP_Param::setup_object_defaults(this, var_info);
 }
 
 AC_HardFence::~AC_HardFence()
@@ -124,7 +93,7 @@ float AC_HardFence::_get_distance_from_breach_point() const
         // Cannot retrieve current position. If we do have a breach, treat it
         // as having infinite distance from the fence as it seems serious
         // enough. Note that this condition still has to prevail for at least
-        // HFENCE_TIMEOUT seconds to cause a motor disarm.
+        // SHOW_HFENCE_DLY seconds to cause a motor disarm.
         return FLT_MAX;
     }
 }

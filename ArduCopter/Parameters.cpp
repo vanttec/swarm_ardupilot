@@ -1076,16 +1076,6 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
 #endif
 
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
-    // @Group: HFENCE_
-    // @Path: ../libraries/AC_HardFence/AC_HardFence.cpp
-    //
-    // This is group 61; it is intentional as we don't want to assign ourselves
-    // a new group ID when new groups are added by the ArduCopter developers.
-    // Group 63 is used as a sentinel element in AP_Param.cpp so that won't
-    // work. Don't try it; the value of the variable at index 3 in this group
-    // will be lost every time the drone is rebooted.
-    AP_SUBGROUPINFO(hard_fence, "HFENCE_", 61, ParametersG2, AC_HardFence),
-
     // @Group: SHOW_
     // @Path: ../libraries/AC_DroneShowManager/AC_DroneShowManager.cpp
     //
@@ -1142,7 +1132,6 @@ ParametersG2::ParametersG2(void)
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
     ,mode_drone_show_ptr(&copter.mode_drone_show)
     ,drone_show_manager()
-    ,hard_fence()
 #endif
 {
     AP_Param::setup_object_defaults(this, var_info);

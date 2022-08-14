@@ -211,7 +211,7 @@ void Copter::init_ardupilot()
     g2.drone_show_manager.init(wp_nav);
 
     // initialise hard fence
-    g2.hard_fence.init();
+    g2.drone_show_manager.hard_fence.init();
 #endif
 
     enum Mode::Number initial_mode = (enum Mode::Number)g.initial_mode.get();

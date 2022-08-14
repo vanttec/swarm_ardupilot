@@ -659,7 +659,6 @@ public:
     // we need a pointer to the mode for the G2 table
     void *mode_drone_show_ptr;
     AC_DroneShowManager_Copter drone_show_manager;
-    AC_HardFence hard_fence;
 #endif
 };
 

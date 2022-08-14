@@ -4,7 +4,6 @@
 /// @brief  Hard geofence with motor shutdown after a prolonged breach
 
 #include <AP_Common/Location.h>
-#include <AP_Param/AP_Param.h>
 
 /// @class  AC_HardFence
 /// @brief  Class managing a hard geofence that shuts down the motors after a prolonged breach
@@ -75,8 +74,6 @@ public:
         );
     }
 
-    static const struct AP_Param::GroupInfo var_info[];
-
 private:
     // Structure holding all the parameters settable by the user
     struct {
@@ -130,4 +127,6 @@ private:
 
     // Returns whether the hard fence module suggests that the vehicle should disarm
     bool _should_disarm() const;
+
+    friend class AC_DroneShowManager;
 };
