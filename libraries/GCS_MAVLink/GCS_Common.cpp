@@ -73,6 +73,10 @@
   #include <AP_UAVCAN/AP_UAVCAN.h>
 #endif
 
+#if HAVE_FILESYSTEM_SUPPORT
+  #include <AP_Filesystem/AP_Filesystem.h>
+#endif
+
 #include <AP_BattMonitor/AP_BattMonitor.h>
 #include <AP_GPS/AP_GPS.h>
 
@@ -4472,7 +4476,11 @@ MAV_RESULT GCS_MAVLINK::handle_command_int_packet(const mavlink_command_int_t &p
             !is_equal(packet.param2, 1.0f)) {
             return MAV_RESULT_UNSUPPORTED;
         }
+#if HAVE_FILESYSTEM_SUPPORT
         return AP::FS().format() ? MAV_RESULT_ACCEPTED : MAV_RESULT_FAILED;
+#else
+        return MAV_RESULT_UNSUPPORTED;
+#endif
     }
 
 #ifdef ENABLE_SCRIPTING
