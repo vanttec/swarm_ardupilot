@@ -93,7 +93,7 @@ float AC_HardFence::_get_distance_from_breach_point() const
         // Cannot retrieve current position. If we do have a breach, treat it
         // as having infinite distance from the fence as it seems serious
         // enough. Note that this condition still has to prevail for at least
-        // SHOW_HFENCE_DLY seconds to cause a motor disarm.
+        // SHOW_HFENCE_TO seconds to cause a motor disarm.
         return FLT_MAX;
     }
 }
