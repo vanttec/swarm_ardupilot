@@ -321,8 +321,6 @@ public:
     void Write_PSCE(float pos_target, float pos, float vel_desired, float vel_target, float vel, float accel_desired, float accel_target, float accel);
     void Write_PSCD(float pos_target, float pos, float vel_desired, float vel_target, float vel, float accel_desired, float accel_target, float accel);
 
-    void Write_GPSRTKPacket(uint16_t type, uint16_t length);
-
     void Write(const char *name, const char *labels, const char *fmt, ...);
     void Write(const char *name, const char *labels, const char *units, const char *mults, const char *fmt, ...);
     void WriteStreaming(const char *name, const char *labels, const char *fmt, ...);

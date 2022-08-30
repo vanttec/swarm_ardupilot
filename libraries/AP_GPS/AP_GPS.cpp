@@ -1285,13 +1285,9 @@ void AP_GPS::inject_data(const uint8_t *data, uint16_t len)
     // Log that we have injected some data to the GPS. We do this only for
     // RTCM3 packets, which we can identify from the preamble.
     if (len > 5 && data[0] == 0xD3) {
-        AP_Logger *logger = AP_Logger::get_singleton();
-        uint16_t type = (data[3] << 4) | (data[4] >> 4);
-
         /* 12 bits from byte 3 encode the message type */
-        if (logger) {
-            logger->Write_GPSRTKPacket(type, len);
-        }
+        uint16_t type = (data[3] << 4) | (data[4] >> 4);
+        Write_GPS_RTK(type, len);
     }
 }
 
@@ -2151,6 +2147,19 @@ void AP_GPS::Write_GPS(uint8_t i)
         undulation    : undulation,
     };
     AP::logger().WriteBlock(&pkt2, sizeof(pkt2));
+}
+
+// Logging support:
+// Write a log entry that logs the injection of an RTK correction packet
+void AP_GPS::Write_GPS_RTK(uint16_t type, uint16_t length)
+{
+    struct log_GPSRTKPacket pkt {
+        LOG_PACKET_HEADER_INIT(LOG_GPS_RTK_PACKET_MSG),
+        time_us : AP_HAL::micros64(),
+        type    : type,
+        length  : length
+    };
+    AP::logger().WriteBlock(&pkt, sizeof(pkt));
 }
 
 /*
