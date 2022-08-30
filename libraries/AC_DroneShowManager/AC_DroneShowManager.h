@@ -245,7 +245,7 @@ public:
 
     // Returns the takeoff speed in meters per second
     float get_takeoff_speed_m_s() const {
-        float result = _wp_nav ? _wp_nav->get_default_speed_up() : 0;
+        float result = _wp_nav ? _wp_nav->get_default_speed_up() / 100.0f : 0;
         if (result <= 0) {
             /* safety check */
             result = DEFAULT_TAKEOFF_SPEED_METERS_PER_SEC;
