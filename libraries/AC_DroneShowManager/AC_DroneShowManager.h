@@ -437,6 +437,9 @@ public:
     // Returns whether the manager uses GPS time to start the show
     bool uses_gps_time_for_show_start() const { return _params.time_sync_mode == TimeSyncMode_GPS; }
 
+    // Writes the log message specific to the drone show manager subsystem into the logs
+    void write_log_message() const;
+
     static const struct AP_Param::GroupInfo var_info[];
 
     // Takeoff speed; we assume that the drone attempts to take off with this

@@ -588,7 +588,7 @@ void Copter::twentyfive_hz_logging()
 
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
     // log the current show state
-    Log_Write_DroneShowStatus();
+    g2.drone_show_manager.write_log_message();
 #endif
 }
 
