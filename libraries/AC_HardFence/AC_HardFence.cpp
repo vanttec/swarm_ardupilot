@@ -124,15 +124,19 @@ void AC_HardFence::_set_state(BreachState new_state)
     old_state = _state;
     _state = new_state;
 
-    // Show messages if we enter or exit the hard breach state
-    if (_state == BreachState::HARD) {
-        if (_params.timeout > 0) {
-            gcs().send_text(MAV_SEVERITY_NOTICE, "Hard fence breached, countdown started");
-        } else {
-            gcs().send_text(MAV_SEVERITY_NOTICE, "Hard fence breached");
+    // Show messages if we enter or exit the hard breach state, but only if we
+    // are enabled -- otherwise we just track the breach state but don't
+    // report it
+    if (_params.enabled) {
+        if (_state == BreachState::HARD) {
+            if (_params.timeout > 0) {
+                gcs().send_text(MAV_SEVERITY_NOTICE, "Hard fence breached, countdown started");
+            } else {
+                gcs().send_text(MAV_SEVERITY_NOTICE, "Hard fence breached");
+            }
+        } else if (old_state == BreachState::HARD) {
+            gcs().send_text(MAV_SEVERITY_INFO, "Hard fence breach resolved");
         }
-    } else if (old_state == BreachState::HARD) {
-        gcs().send_text(MAV_SEVERITY_INFO, "Hard fence breach resolved");
     }
 
     switch (_state) {

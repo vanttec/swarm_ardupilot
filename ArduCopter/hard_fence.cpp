@@ -24,7 +24,9 @@ void Copter::hard_fence_check()
     // logic, which does not require fence.get_breach_distance()
     if (g2.drone_show_manager.hard_fence.notify_active_breaches(breaches)) {
         // Module requested the motors to be stopped forcibly. Send a notification
-        // first if we haven't done so recently.
+        // first if we haven't done so recently. There is no need to check whether
+        // the hard fence is enabled as it is not supposed to return true if it
+        // is disabled.
         if (last_breach_notification_sent < AP_HAL::millis() - 5000) {
             GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Hard fence breached, disarming");
             last_breach_notification_sent = AP_HAL::millis();
