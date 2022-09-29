@@ -23,6 +23,27 @@ void AC_HardFence::init()
 
 bool AC_HardFence::notify_active_breaches(uint8_t breaches)
 {
+    static bool _was_enabled = false;
+    bool is_enabled = _params.enabled;
+
+    if (is_enabled && !_was_enabled) {
+        BreachState current_state = _state;
+
+        // We have just been activated. If the current state of the hard fence
+        // is not 'none" (i.e. there is a soft or hard breach), let's trigger
+        // a state change from 'none' to the breach state to ensure that the
+        // internal state variables are up-to-date. This will ensure that the
+        // breach timer starts now even if the drone has stayed out of the
+        // current hard fence zone for a long time, and also ensure that a
+        // GCS message is sent if we are currently in a breached state.
+        if (current_state != BreachState::NONE) {
+            _set_state(BreachState::NONE);
+            _set_state(current_state);
+        }
+    }
+
+    _was_enabled = is_enabled;
+
     switch (_state) {
         case BreachState::NONE:
             // If there were no breaches so far, and we have some now, that's a
@@ -128,15 +149,7 @@ void AC_HardFence::_set_state(BreachState new_state)
     // are enabled -- otherwise we just track the breach state but don't
     // report it
     if (_params.enabled) {
-        if (_state == BreachState::HARD) {
-            if (_params.timeout > 0) {
-                gcs().send_text(MAV_SEVERITY_NOTICE, "Hard fence breached, countdown started");
-            } else {
-                gcs().send_text(MAV_SEVERITY_NOTICE, "Hard fence breached");
-            }
-        } else if (old_state == BreachState::HARD) {
-            gcs().send_text(MAV_SEVERITY_INFO, "Hard fence breach resolved");
-        }
+        _show_gcs_message_on_state_change(old_state);
     }
 
     switch (_state) {
@@ -173,5 +186,18 @@ bool AC_HardFence::_should_disarm() const
         return false;
     } else {
         return get_seconds_since_last_hard_breach() >= _params.timeout;
+    }
+}
+
+void AC_HardFence::_show_gcs_message_on_state_change(BreachState old_state) const
+{
+    if (_state == BreachState::HARD) {
+        if (_params.timeout > 0) {
+            gcs().send_text(MAV_SEVERITY_NOTICE, "Hard fence breached, countdown started");
+        } else {
+            gcs().send_text(MAV_SEVERITY_NOTICE, "Hard fence breached");
+        }
+    } else if (old_state == BreachState::HARD) {
+        gcs().send_text(MAV_SEVERITY_INFO, "Hard fence breach resolved");
     }
 }

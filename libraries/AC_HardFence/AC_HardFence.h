@@ -128,5 +128,8 @@ private:
     // Returns whether the hard fence module suggests that the vehicle should disarm
     bool _should_disarm() const;
 
+    // Shows a message to the GCS when the state of the hard fence changes
+    void _show_gcs_message_on_state_change(BreachState old_state = BreachState::NONE) const;
+    
     friend class AC_DroneShowManager;
 };
