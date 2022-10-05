@@ -30,15 +30,18 @@ bool AC_HardFence::notify_active_breaches(uint8_t breaches)
         BreachState current_state = _state;
 
         // We have just been activated. If the current state of the hard fence
-        // is not 'none" (i.e. there is a soft or hard breach), let's trigger
-        // a state change from 'none' to the breach state to ensure that the
-        // internal state variables are up-to-date. This will ensure that the
-        // breach timer starts now even if the drone has stayed out of the
-        // current hard fence zone for a long time, and also ensure that a
-        // GCS message is sent if we are currently in a breached state.
-        if (current_state != BreachState::NONE) {
-            _set_state(BreachState::NONE);
-            _set_state(current_state);
+        // is not 'none" (i.e. there is a soft or hard breach), let's make sure
+        // that the timeout is cleared so the drone doesn't fall off the sky
+        // immediately even if it has been out of the hard fence for a long
+        // time now
+        if (current_state >= BreachState::HARD) {
+            _current_hard_breach_started_at = AP_HAL::millis();
+        }
+        if (current_state >= BreachState::SOFT) {
+            _current_soft_breach_started_at = AP_HAL::millis();
+        }
+        if (current_state >= BreachState::SOFT) {
+            _show_gcs_message_on_state_change();
         }
     }
 
