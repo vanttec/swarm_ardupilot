@@ -33,6 +33,9 @@ enum DroneShowLEDType {
 
     // LED light is attached to servo channels with inverted polarity
     DroneShowLEDType_InvertedServo = 8,
+
+    // WGDrones LED
+    DroneShowLEDType_WGDrones = 9,
 };
 
 class DroneShowLEDFactory
