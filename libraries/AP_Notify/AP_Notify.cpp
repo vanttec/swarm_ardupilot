@@ -40,6 +40,8 @@
 #include "ScriptingLED.h"
 #include "DShotLED.h"
 
+#include "DroneShowNotificationBackend.h"
+
 extern const AP_HAL::HAL& hal;
 
 AP_Notify *AP_Notify::_singleton;
@@ -385,6 +387,9 @@ void AP_Notify::add_backends(void)
     ADD_BACKEND(new SITL_SFML_LED());
 #endif
 #endif // Noise makers
+ 
+    // Drone show module related backend
+    ADD_BACKEND(new DroneShowNotificationBackend());
 
 }
 

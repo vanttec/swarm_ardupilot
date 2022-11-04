@@ -141,6 +141,9 @@ const struct MultiplierStructure log_Multipliers[] = {
 #include <AP_RPM/LogStructure.h>
 #include <AC_Fence/LogStructure.h>
 
+#include <AP_GPS/LogStructure_RTK.h>
+#include <AC_DroneShowManager/LogStructure.h>
+
 // structure used to define logging format
 // It is packed on ChibiOS to save flash space; however, this causes problems
 // when building the SITL on an Apple M1 CPU (and is also slower) so we do not
@@ -1331,7 +1334,9 @@ LOG_STRUCTURE_FROM_AIS \
     { LOG_VER_MSG, sizeof(log_VER), \
       "VER",   "QBHBBBBIZH", "TimeUS,BT,BST,Maj,Min,Pat,FWT,GH,FWS,APJ", "s---------", "F---------", false }, \
     { LOG_MOTBATT_MSG, sizeof(log_MotBatt), \
-      "MOTB", "QffffB",  "TimeUS,LiftMax,BatVolt,ThLimit,ThrAvMx,FailFlags", "s-----", "F-----" , true }
+      "MOTB", "QffffB",  "TimeUS,LiftMax,BatVolt,ThLimit,ThrAvMx,FailFlags", "s-----", "F-----" , true }, \
+LOG_STRUCTURE_FROM_DRONE_SHOW, \
+LOG_STRUCTURE_FROM_GPS_RTK
 
 // message types 0 to 63 reserved for vehicle specific use
 
@@ -1417,6 +1422,9 @@ enum LogMessages : uint8_t {
     LOG_RCOUT2_MSG,
     LOG_RCOUT3_MSG,
     LOG_IDS_FROM_FENCE,
+
+    LOG_IDS_FROM_DRONE_SHOW,
+    LOG_IDS_FROM_GPS_RTK,
 
     _LOG_LAST_MSG_
 };

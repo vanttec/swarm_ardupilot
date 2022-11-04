@@ -236,6 +236,9 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
 #ifdef USERHOOK_FASTLOOP
     SCHED_TASK(userhook_FastLoop,    100,     75, 153),
 #endif
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    SCHED_TASK_CLASS(AC_DroneShowManager, (AC_DroneShowManager*)&copter.g2.drone_show_manager, update, 50, 100, 155),
+#endif
 #ifdef USERHOOK_50HZLOOP
     SCHED_TASK(userhook_50Hz,         50,     75, 156),
 #endif
@@ -572,6 +575,11 @@ void Copter::twentyfive_hz_logging()
         //update autorotation log
         g2.arot.Log_Write_Autorotation();
     }
+#endif
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // log the current show state
+    g2.drone_show_manager.write_log_message();
 #endif
 }
 
