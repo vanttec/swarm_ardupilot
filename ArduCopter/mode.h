@@ -1658,6 +1658,9 @@ protected:
     const char *name4() const override { return "TRTL"; }
 
 private:
+    void arm_motors();
+    void disarm_motors();
+
     float motors_output;
     Vector2f motors_input;
 };

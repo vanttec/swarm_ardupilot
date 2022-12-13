@@ -333,8 +333,13 @@ bool Compass::is_calibrating() const
             case CompassCalibrator::Status::SUCCESS:
             case CompassCalibrator::Status::FAILED:
             case CompassCalibrator::Status::BAD_ORIENTATION:
-                break;
-            default:
+            case CompassCalibrator::Status::BAD_RADIUS:
+                // this backend isn't calibrating,
+                // but maybe the next one is:
+                continue;
+            case CompassCalibrator::Status::WAITING_TO_START:
+            case CompassCalibrator::Status::RUNNING_STEP_ONE:
+            case CompassCalibrator::Status::RUNNING_STEP_TWO:
                 return true;
         }
     }

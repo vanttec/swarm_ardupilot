@@ -48,6 +48,7 @@ class AP_Mount_Alexmos;
 class AP_Mount_SToRM32;
 class AP_Mount_SToRM32_serial;
 class AP_Mount_Gremsy;
+class AP_Mount_Siyi;
 
 /*
   This is a workaround to allow the MAVLink backend access to the
@@ -64,6 +65,7 @@ class AP_Mount
     friend class AP_Mount_SToRM32;
     friend class AP_Mount_SToRM32_serial;
     friend class AP_Mount_Gremsy;
+    friend class AP_Mount_Siyi;
 
 public:
     AP_Mount();
@@ -86,7 +88,8 @@ public:
         Mount_Type_SToRM32 = 4,         /// SToRM32 mount using MAVLink protocol
         Mount_Type_SToRM32_serial = 5,  /// SToRM32 mount using custom serial protocol
         Mount_Type_Gremsy = 6,          /// Gremsy gimbal using MAVLink v2 Gimbal protocol
-        Mount_Type_BrushlessPWM = 7     /// Brushless (stabilized) gimbal using PWM protocol
+        Mount_Type_BrushlessPWM = 7,    /// Brushless (stabilized) gimbal using PWM protocol
+        Mount_Type_Siyi = 8,            /// Siyi gimbal using custom serial protocol
     };
 
     // init - detect and initialise all mounts
@@ -157,6 +160,28 @@ public:
     // run pre-arm check.  returns false on failure and fills in failure_msg
     // any failure_msg returned will not include a prefix
     bool pre_arm_checks(char *failure_msg, uint8_t failure_msg_len);
+
+    //
+    // camera controls for gimbals that include a camera
+    //
+
+    // take a picture
+    bool take_picture(uint8_t instance);
+
+    // start or stop video recording
+    // set start_recording = true to start record, false to stop recording
+    bool record_video(uint8_t instance, bool start_recording);
+
+    // set camera zoom step
+    // zoom out = -1, hold = 0, zoom in = 1
+    bool set_zoom_step(uint8_t instance, int8_t zoom_step);
+
+    // set focus in, out or hold
+    // focus in = -1, focus hold = 0, focus out = 1
+    bool set_manual_focus_step(uint8_t instance, int8_t focus_step);
+
+    // auto focus
+    bool set_auto_focus(uint8_t instance);
 
     // parameter var table
     static const struct AP_Param::GroupInfo        var_info[];
