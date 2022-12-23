@@ -3386,11 +3386,13 @@ void GCS_MAVLINK::handle_odometry(const mavlink_message_t &msg)
         posErr = cbrtf(sq(m.pose_covariance[0])+sq(m.pose_covariance[6])+sq(m.pose_covariance[11]));
         angErr = cbrtf(sq(m.pose_covariance[15])+sq(m.pose_covariance[18])+sq(m.pose_covariance[20]));
     }
-    
+
     const uint32_t timestamp_ms = correct_offboard_timestamp_usec_to_ms(m.time_usec, PAYLOAD_SIZE(chan, ODOMETRY));
     visual_odom->handle_vision_position_estimate(m.time_usec, timestamp_ms, m.x, m.y, m.z, q, posErr, angErr, m.reset_counter);
 
-    const Vector3f vel{m.vx, m.vy, m.vz};
+    // convert velocity vector from FRD to NED frame
+    Vector3f vel{m.vx, m.vy, m.vz};
+    vel = q * vel;
     visual_odom->handle_vision_speed_estimate(m.time_usec, timestamp_ms, vel, m.reset_counter);
 #endif
 }
