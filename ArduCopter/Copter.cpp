@@ -598,6 +598,13 @@ void Copter::three_hz_loop()
 #if AP_FENCE_ENABLED
     // check if we have breached a fence
     fence_check();
+  #if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // also check whether we have breached the fence for long enough to
+    // warrant a motor shutdown. This must be called after fence_check()
+    // to ensure that the breaches have already been updated in the fence
+    // object
+    hard_fence_check();
+  #endif
 #endif // AP_FENCE_ENABLED
 
 

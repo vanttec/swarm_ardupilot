@@ -9,6 +9,7 @@
 #include <AP_Notify/RGBLed.h>
 #include <AP_Param/AP_Param.h>
 
+#include <AC_HardFence/AC_HardFence.h>
 #include <AC_WPNav/AC_WPNav.h>
 
 #include <skybrush/colors.h>
@@ -441,6 +442,12 @@ public:
     void write_log_message() const;
 
     static const struct AP_Param::GroupInfo var_info[];
+
+    // Hard fence subsystem. This should really have to be in Copter or some
+    // other top-level class; we put it here because we are trying to restrict
+    // ourselves to the SHOW_ parameter group only, and that one is managed by
+    // AC_DroneShowManager.
+    AC_HardFence hard_fence;
 
     // Takeoff speed; we assume that the drone attempts to take off with this
     // vertical speed if WPNAV_SPEED_UP seems invalid

@@ -181,7 +181,10 @@
 #include "mode.h"
 
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
-#include "mode_drone_show.h"
+ #include "mode_drone_show.h"
+ #if AP_FENCE_ENABLED
+  #include <AC_HardFence/AC_HardFence.h>
+ #endif
 #endif
 
 #if COLLMOT_EXTENSIONS_ENABLED == ENABLED
@@ -856,6 +859,10 @@ private:
     void Log_Write_SysID_Data(float waveform_time, float waveform_sample, float waveform_freq, float angle_x, float angle_y, float angle_z, float accel_x, float accel_y, float accel_z);
     void Log_Write_Vehicle_Startup_Messages();
     void log_init(void);
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED && AP_FENCE_ENABLED
+    void hard_fence_check();
+#endif
 
     // mode.cpp
     bool set_mode(Mode::Number mode, ModeReason reason);
