@@ -27,4 +27,4 @@ struct PACKED log_DroneShowStatus {
 
 #define LOG_STRUCTURE_FROM_DRONE_SHOW \
     { LOG_DRONE_SHOW_MSG, sizeof(log_DroneShowStatus),                  \
-      "SHOW", "QiBBBB", "TimeUS,ClockMS,Stage,R,G,B", "ss----", "F0----" }
+      "SHOW", "QiBBBB", "TimeUS,ClockMS,Stage,R,G,B", "ss----", "FC----" }
