@@ -596,7 +596,7 @@ const struct LogStructure Copter::log_structure[] = {
 
 #if MODE_DRONE_SHOW_ENABLED == ENABLED
     { LOG_DRONE_SHOW_MSG, sizeof(log_DroneShowStatus),
-      "SHOW", "QiBBBB", "TimeUS,ClockMS,Stage,R,G,B", "ss----", "F0----" },
+      "SHOW", "QiBBBB", "TimeUS,ClockMS,Stage,R,G,B", "ss----", "FC----" },
 #endif
 };
 
