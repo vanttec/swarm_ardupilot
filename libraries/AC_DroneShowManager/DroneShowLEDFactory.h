@@ -36,6 +36,9 @@ enum DroneShowLEDType {
 
     // WGDrones LED
     DroneShowLEDType_WGDrones = 9,
+
+    // LED light is to be forwarded to a NeoPixel RGBW LED strip
+    DroneShowLEDType_NeoPixel_RGBW = 10,
 };
 
 class DroneShowLEDFactory

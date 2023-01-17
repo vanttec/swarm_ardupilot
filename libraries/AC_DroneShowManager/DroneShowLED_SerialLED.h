@@ -14,7 +14,9 @@ typedef enum {
 
 /**
  * RGB LED implementation that sends the current state of the RGB LED to a
- * NeoPixel LED strip.
+ * NeoPixel or ProfiLED LED strip.
+ *
+ * The NeoPixel variant assumes that the wire ordering of the components is GRB.
  */
 class DroneShowLED_SerialLED : public DroneShowLED {
 public:
