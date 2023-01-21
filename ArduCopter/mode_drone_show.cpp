@@ -355,6 +355,10 @@ void ModeDroneShow::wait_for_start_time_run()
     attitude_control->reset_rate_controller_I_terms();
     pos_control->standby_xyz_reset();
 
+    // Force attitude controller to zero target angles and yaw rate in case it
+    // received something else from somewhere before we switched to this mode
+    attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(0.0f, 0.0f, 0.0f);
+
     // This is copied from ModeStabilize::run() -- it is needed to allow the 
     // user to turn on the motors and spin them up while idling on the ground.
     // The part that allows unlimited throttle is removed; we allow unlimited
