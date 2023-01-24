@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Helper script to build ArduCopter for multiple FMUs
 # 
@@ -30,7 +30,7 @@ mkdir -p dist/
 if [ ! -d .venv ]; then
     python3 -m venv .venv
     .venv/bin/pip install -U pip wheel
-    .venv/bin/pip install future empy intelhex
+    .venv/bin/pip install future empy intelhex pexpect
 fi
 
 export PATH=".venv/bin:$PATH"
