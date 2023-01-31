@@ -1,12 +1,9 @@
 #include <AP_Filesystem/AP_Filesystem_Available.h>
 #include <GCS_MAVLink/GCS.h>
 
-#if HAVE_FILESYSTEM_SUPPORT
-
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include <AP_Filesystem/AP_Filesystem.h>
 #include <AP_GPS/AP_GPS.h>
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Logger/AP_Logger.h>
@@ -28,16 +25,6 @@
 #undef BLUE    // from AP_Notify/RGBLed.h
 #undef YELLOW  // from AP_Notify/RGBLed.h
 #undef WHITE   // from AP_Notify/RGBLed.h
-
-#ifndef HAL_BOARD_COLLMOT_DIRECTORY
-#  if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-#    define HAL_BOARD_COLLMOT_DIRECTORY "./collmot"
-#  else
-#    define HAL_BOARD_COLLMOT_DIRECTORY "/COLLMOT"
-#  endif
-#endif
-
-#define SHOW_FILE (HAL_BOARD_COLLMOT_DIRECTORY "/show.skyb")
 
 // Default update rate for position and velocity targets
 #define DEFAULT_UPDATE_RATE_HZ 10
@@ -331,6 +318,7 @@ AC_DroneShowManager::AC_DroneShowManager() :
     _sock_rgb(true),
     _sock_rgb_open(false),
 #endif
+    _show_storage_backend(),
     _show_data(0),
     _trajectory_valid(false),
     _light_program_valid(false),
@@ -383,20 +371,7 @@ AC_DroneShowManager::~AC_DroneShowManager()
 
 void AC_DroneShowManager::early_init()
 {
-    // AP::FS().mkdir() apparently needs lots of free memory, see:
-    // https://github.com/ArduPilot/ardupilot/issues/16103
-    EXPECT_DELAY_MS(3000);
-
-    if (AP::FS().mkdir(HAL_BOARD_COLLMOT_DIRECTORY) < 0) {
-        if (errno == EEXIST) {
-            // Directory already exists, this is okay
-        } else {
-            hal.console->printf(
-                "Failed to create directory %s: %s (code %d)\n",
-                 HAL_BOARD_COLLMOT_DIRECTORY, strerror(errno), errno
-            );
-        }
-    }
+    _show_storage_backend.init();
 }
 
 void AC_DroneShowManager::init(const AC_WPNav* wp_nav)
@@ -974,14 +949,8 @@ bool AC_DroneShowManager::reload_or_clear_show(bool do_clear)
     }
 
     if (do_clear) {
-        if (AP::FS().unlink(SHOW_FILE)) {
-            // Error while removing the file; did it exist?
-            if (errno == ENOENT) {
-                // File was missing already, this is OK.
-            } else {
-                // This is a genuine failure
-                return false;
-            }
+        if (!_show_storage_backend.remove_show_file()) {
+            return false;
         }
     }
 
@@ -1645,11 +1614,9 @@ bool AC_DroneShowManager::is_prepared_to_take_off() const
 
 bool AC_DroneShowManager::_load_show_file_from_storage()
 {
-    int fd;
-    int retval;
-    struct stat stat_data;
-    uint8_t *show_data, *write_ptr, *end_ptr;
-    ssize_t to_read, actually_read;
+    sb_error_t retval;
+    uint8_t *show_data;
+    size_t length;
     bool success = false;
 
     // Clear any previously loaded show
@@ -1657,85 +1624,9 @@ bool AC_DroneShowManager::_load_show_file_from_storage()
     _set_trajectory_and_take_ownership(0);
     _set_show_data_and_take_ownership(0);
 
-    // Check whether the show file exists
-    retval = AP::FS().stat(SHOW_FILE, &stat_data);
-    if (retval)
-    {
-        // Show file does not exist. This basically means that the operation
-        // was successful.
-        return true;
-    }
-
-    // Ensure that we have a sensible block size that we will use when reading
-    // the show file
-    if (stat_data.st_blksize < 1)
-    {
-        stat_data.st_blksize = 4096;
-    }
-
-    // Allocate memory for the whole content of the file
-    show_data = static_cast<uint8_t *>(calloc(stat_data.st_size, sizeof(uint8_t)));
-    if (show_data == 0)
-    {
-        hal.console->printf(
-            "Show file too large: %ld bytes\n",
-            static_cast<long int>(stat_data.st_size));
+    // Load the show file from the storage backend
+    if (!_show_storage_backend.load_show_file(&show_data, &length)) {
         return false;
-    }
-
-    // Read the entire show file into memory
-    fd = AP::FS().open(SHOW_FILE, O_RDONLY);
-    if (fd < 0)
-    {
-        free(show_data);
-        show_data = write_ptr = end_ptr = 0;
-    }
-    else
-    {
-        write_ptr = show_data;
-        end_ptr = show_data + stat_data.st_size;
-    }
-
-    while (write_ptr < end_ptr)
-    {
-        to_read = end_ptr - write_ptr;
-        if (to_read > stat_data.st_blksize)
-        {
-            to_read = stat_data.st_blksize;
-        }
-
-        if (to_read == 0)
-        {
-            break;
-        }
-
-        actually_read = AP::FS().read(fd, write_ptr, to_read);
-        if (actually_read < 0)
-        {
-            /* Error while reading */
-            hal.console->printf(
-                "IO error while reading show file near byte %ld, errno = %d\n",
-                static_cast<long int>(write_ptr - show_data),
-                static_cast<int>(errno)
-            );
-            free(show_data);
-            show_data = 0;
-            break;
-        }
-        else if (actually_read == 0)
-        {
-            /* EOF */
-            break;
-        }
-        else
-        {
-            write_ptr += actually_read;
-        }
-    }
-
-    if (fd > 0)
-    {
-        AP::FS().close(fd);
     }
 
     // Parse the show file and find the trajectory and the light program in it
@@ -1746,7 +1637,7 @@ bool AC_DroneShowManager::_load_show_file_from_storage()
 
         _set_show_data_and_take_ownership(show_data);
 
-        retval = sb_trajectory_init_from_binary_file_in_memory(&loaded_trajectory, show_data, stat_data.st_size);
+        retval = sb_trajectory_init_from_binary_file_in_memory(&loaded_trajectory, show_data, length);
         if (retval)
         {
             hal.console->printf("Error while parsing show file: %d\n", (int) retval);
@@ -1765,7 +1656,7 @@ bool AC_DroneShowManager::_load_show_file_from_storage()
             }
         }
 
-        retval = sb_light_program_init_from_binary_file_in_memory(&loaded_light_program, show_data, stat_data.st_size);
+        retval = sb_light_program_init_from_binary_file_in_memory(&loaded_light_program, show_data, length);
         if (retval == SB_ENOENT)
         {
             // No light program in show file, this is okay, we just create an
@@ -2350,5 +2241,3 @@ static bool is_safe_to_change_start_time_in_stage(DroneShowModeStage stage) {
         stage == DroneShow_Landed
     );
 }
-
-#endif  // HAVE_FILESYSTEM_SUPPORT

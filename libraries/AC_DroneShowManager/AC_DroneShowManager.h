@@ -14,6 +14,8 @@
 
 #include <skybrush/colors.h>
 
+#include "DroneShowStorage.h"
+
 struct sb_trajectory_s;
 struct sb_trajectory_player_s;
 
@@ -529,7 +531,10 @@ private:
     bool _sock_rgb_open;
 #endif
 
-    // Memory area holding the entire show file loaded from the storage
+    // Object that knows how to access the stored show data in the storage backend
+    DroneShowStorage _show_storage_backend;
+
+    // Memory area holding the entire show file loaded from the storage backend
     uint8_t* _show_data;
 
     struct sb_trajectory_s* _trajectory;
