@@ -4,6 +4,9 @@
 
 #include "AP_Logger_Block.h"
 
+#define HAL_FS_IN_FLASH_MEM_ENABLED 1
+#define HAL_FS_IN_FLASH_MEM_SIZE_BLOCKS 4  /* 256K for dataflash, 512K for W25N01GV */
+
 #if HAL_LOGGING_BLOCK_ENABLED
 
 #include <AP_HAL/AP_HAL.h>
@@ -39,6 +42,15 @@ void AP_Logger_Block::Init(void)
     if (CardInserted()) {
         // reserve space for version in last sector
         df_NumPages -= df_PagePerBlock;
+
+#if HAL_FS_IN_FLASH_MEM_ENABLED
+        if (df_NumPages > HAL_FS_IN_FLASH_MEM_SIZE_BLOCKS) {
+            // reserve space for embedded LittleFS filesystem
+            df_NumPages -= HAL_FS_IN_FLASH_MEM_SIZE_BLOCKS * df_PagePerBlock;
+        } else {
+            AP_HAL::panic("Not enough flash memory for flash-based filesystem");
+        }
+#endif
 
         // determine and limit file backend buffersize
         uint32_t bufsize = _front._params.file_bufsize;
