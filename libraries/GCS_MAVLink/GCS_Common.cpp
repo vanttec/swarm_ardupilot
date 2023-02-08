@@ -444,6 +444,10 @@ void GCS_MAVLINK::send_distance_sensor()
     }
 #endif
 
+#ifdef MT_A10_RANGEFINDER_WORKAROUND
+    filter_possible_proximity_sensors = false;
+#endif
+
     for (uint8_t i = 0; i < RANGEFINDER_MAX_INSTANCES; i++) {
         if (!HAVE_PAYLOAD_SPACE(chan, DISTANCE_SENSOR)) {
             return;
@@ -460,7 +464,11 @@ void GCS_MAVLINK::send_distance_sensor()
     }
 
 #if HAL_PROXIMITY_ENABLED
+#ifdef MT_A10_RANGEFINDER_WORKAROUND
+    // send_proximity();
+#else
     send_proximity();
+#endif
 #endif
 }
 

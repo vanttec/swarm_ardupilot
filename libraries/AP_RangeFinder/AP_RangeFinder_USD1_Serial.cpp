@@ -162,7 +162,18 @@ bool AP_RangeFinder_USD1_Serial::get_reading(float &reading_m)
     }
 
     if (count == 0) {
+#ifdef MT_A10_RANGEFINDER_WORKAROUND
+        // HACK HACK HACK: if we haven't received a valid reading for a long
+        // time, simulate a reading with a relatively large distance
+        if (AP_HAL::millis() - state.last_reading_ms > read_timeout_ms() / 2) {
+            sum = 16383;  /* 2^14 - 1 */
+            count = 1;
+        } else {
+            return false;
+        }
+#else
         return false;
+#endif
     }
 
     reading_m = (sum * 0.01) / count;
