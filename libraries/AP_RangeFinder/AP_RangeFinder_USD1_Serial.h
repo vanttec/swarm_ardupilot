@@ -53,6 +53,8 @@ private:
     bool     _version_known;
     uint8_t  _header;
     uint8_t  _version;
+
+    uint32_t _send_fake_valid_reading_until;
 };
 
 #endif  // AP_RANGEFINDER_USD1_SERIAL_ENABLED
