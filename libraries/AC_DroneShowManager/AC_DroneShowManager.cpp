@@ -1763,6 +1763,10 @@ bool AC_DroneShowManager::_load_show_file_from_storage()
                 );
                 success = true;
             }
+            else
+            {
+                hal.console->printf("Take off or landing time not valid!");
+            }
         }
 
         retval = sb_light_program_init_from_binary_file_in_memory(&loaded_light_program, show_data, stat_data.st_size);
