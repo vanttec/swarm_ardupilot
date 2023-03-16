@@ -1765,7 +1765,7 @@ bool AC_DroneShowManager::_load_show_file_from_storage()
             }
             else
             {
-                hal.console->printf("Take off or landing time not valid!");
+                hal.console->printf("Takeoff or landing time is invalid!\n");
             }
         }
 
