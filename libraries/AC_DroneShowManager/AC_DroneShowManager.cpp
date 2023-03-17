@@ -1361,10 +1361,21 @@ void AC_DroneShowManager::_flash_leds_after_success()
     _flash_leds_with_color(0, 255, 0, /* count = */ 3, LightEffectPriority_Internal);
 }
 
-void AC_DroneShowManager::_flash_leds_with_color(uint8_t red, uint8_t green, uint8_t blue, uint8_t count, LightEffectPriority priority)
+void AC_DroneShowManager::_flash_leds_to_attract_attention(LightEffectPriority priority)
 {
+    _flash_leds_with_color(
+        255, 255, 255, /* count = */ 5, priority,
+        /* enhance_brightness = */ true
+    );
+}
+
+void AC_DroneShowManager::_flash_leds_with_color(
+    uint8_t red, uint8_t green, uint8_t blue, uint8_t count,
+    LightEffectPriority priority, bool enhance_brightness
+) {
     _light_signal.started_at_msec = AP_HAL::millis();
     _light_signal.priority = priority;
+    _light_signal.enhance_brightness = enhance_brightness;
 
     _light_signal.duration_msec = count * 300 - 200;  /* 100ms on, 200ms off */
     _light_signal.color[0] = red;
@@ -1527,6 +1538,7 @@ bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& m
 
     _light_signal.started_at_msec = AP_HAL::millis();
     _light_signal.priority = priority;
+    _light_signal.enhance_brightness = false;
 
     if (packet.custom_len < 2) {
         // Start blinking the drone show LED
@@ -1534,7 +1546,7 @@ bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& m
             mask = packet.custom_bytes[0];
         }
         if (matches_group_mask(mask)) {
-            _flash_leds_with_color(255, 255, 255, /* count = */ 5, priority);
+            _flash_leds_to_attract_attention(priority);
         }
     } else if (packet.custom_len == 3) {
         // Set the drone show LED to a specific color for five seconds
@@ -1930,6 +1942,7 @@ void AC_DroneShowManager::_update_lights()
     const uint32_t MODE_RTL = 6, MODE_SMART_RTL = 21, MODE_LAND = 9, MODE_DRONE_SHOW = 127;
     sb_rgb_color_t color = Colors::BLACK;
     bool light_signal_affected_by_brightness_setting = true;
+    bool enhance_brightness = false;
     int brightness = _params.preflight_light_signal_brightness;
     uint8_t pattern = 0b11111111;
     const uint8_t BLINK = 0b11110000;
@@ -1995,6 +2008,12 @@ void AC_DroneShowManager::_update_lights()
                 color.red = _light_signal.color[0] * factor;
                 color.green = _light_signal.color[1] * factor;
                 color.blue = _light_signal.color[2] * factor;
+
+                // If the user requested enhanced brightness, and the color
+                // is a shade of gray, set the white channel to the same value
+                // as the R, G and B channels. This is used to enhance the
+                // brightness of the "where are you" signal sent from the GCS.
+                enhance_brightness = _light_signal.enhance_brightness;
             }
         }
 
@@ -2193,7 +2212,12 @@ void AC_DroneShowManager::_update_lights()
         // No need to test whether the RGB values or the gamma correction
         // changed because the LED classes do this on their own
         _rgb_led->set_gamma(_params.led_specs[0].gamma);
-        _rgb_led->set_rgb(color.red, color.green, color.blue);
+
+        if (enhance_brightness && color.red == color.green && color.green == color.blue) {
+            _rgb_led->set_rgbw(color.red, color.green, color.blue, color.red);
+        } else {
+            _rgb_led->set_rgb(color.red, color.green, color.blue);
+        }
     }
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL

@@ -583,16 +583,17 @@ private:
     // start of the show, in seconds. Zero if unscheduled.
     float _crtl_start_time_sec;
 
-    // Time when the user requested a light signal, in milliseconds; zero if
-    // no signal was requested.
+    // Structure storing the details of a light signal requested by the user,
+    // including its start time, duration, color, priority etc.
     struct {
-        uint32_t started_at_msec;
-        uint16_t duration_msec;
-        uint8_t color[3];
-        LightEffectType effect;
-        LightEffectPriority priority;
-        uint16_t period_msec;
-        uint16_t phase_msec;
+        uint32_t started_at_msec;       //< Start time of the light signal
+        uint16_t duration_msec;         //< Duration of the light signal
+        uint8_t color[3];               //< Color of the light signal
+        LightEffectType effect;         //< Type of the light signal (flash, pulsating etc)
+        LightEffectPriority priority;   //< Priority of the signal
+        uint16_t period_msec;           //< Period of the light signal when applicable
+        uint16_t phase_msec;            //< Phase of the light signal when applicable
+        uint8_t enhance_brightness;     //< Whether to enhance the brightness using the W LED if possible
     } _light_signal;
 
     // Current execution stage of the drone show mode. This is pushed here from
@@ -669,8 +670,16 @@ private:
     // operation (like a successful compass calibration)
     void _flash_leds_after_success();
 
+    // Produces a light signal that tries to attract attention to the drone;
+    // typically triggered by the operator from the GCS to find a particular
+    // drone in a swarm.
+    void _flash_leds_to_attract_attention(LightEffectPriority priority);
+
     // Flashes the LEDs of the drone with the given color
-    void _flash_leds_with_color(uint8_t red, uint8_t green, uint8_t blue, uint8_t count, LightEffectPriority priority);
+    void _flash_leds_with_color(
+        uint8_t red, uint8_t green, uint8_t blue, uint8_t count,
+        LightEffectPriority priority, bool enhance_brightness = false
+    );
 
     // Returns a timestamp meant to be used solely for the purposes of implementing
     // light signals. The timestamp is synced to GPS seconds when the drone has
