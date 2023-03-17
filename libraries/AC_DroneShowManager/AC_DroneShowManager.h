@@ -517,6 +517,9 @@ private:
 
             // The exponent of the gamma correcion on this LED light channel
             AP_Float gamma;
+
+            // Color temperature of the white LED when the LED light channel uses an extra white LED
+            AP_Float white_temperature;
         } led_specs[1];
     } _params;
 

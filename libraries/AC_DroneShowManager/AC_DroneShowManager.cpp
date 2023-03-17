@@ -212,6 +212,14 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("LED0_GAMMA", 19, AC_DroneShowManager, _params.led_specs[0].gamma, 1.0f),
 
+    // @Param: LED0_WTEMP
+    // @DisplayName: Color temperature of the white LED of the channel
+    // @Description: Specifies the color temperature of the white LED of the channel if the channel makes use of an additional white LED. Set to zero if you don't know the color temperature of the white LED or if there is no white LED.
+    // @Range: 0 15000
+    // @Increment: 100
+    // @User: Advanced
+    AP_GROUPINFO("LED0_WTEMP", 23, AC_DroneShowManager, _params.led_specs[0].white_temperature, 0.0f),
+
     // @Param: MODE_BOOT
     // @DisplayName: Conditions for entering show mode
     // @Description: Bitfield that specifies when the drone should switch to show mode automatically
@@ -311,7 +319,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("HFENCE_TO", 22, AC_DroneShowManager, hard_fence._params.timeout, 5),
 
-    // Currently used max parameter ID: 22; update this if you add more parameters.
+    // Currently used max parameter ID: 23; update this if you add more parameters.
     // Note that the max parameter ID may appear in the middle of the above list.
 
     AP_GROUPEND
@@ -2213,9 +2221,23 @@ void AC_DroneShowManager::_update_lights()
         // changed because the LED classes do this on their own
         _rgb_led->set_gamma(_params.led_specs[0].gamma);
 
-        if (enhance_brightness && color.red == color.green && color.green == color.blue) {
-            _rgb_led->set_rgbw(color.red, color.green, color.blue, color.red);
+        if (_rgb_led->supports_white_channel()) {
+            // Code path for LEDs that support a white channel
+            sb_rgbw_conversion_t conv;
+            sb_rgbw_color_t rgbw_color;
+
+            if (enhance_brightness && color.red == color.green && color.green == color.blue) {
+                sb_rgbw_conversion_use_fixed_value(&conv, color.red);
+            } else if (_params.led_specs[0].white_temperature > 0) {
+                sb_rgbw_conversion_use_color_temperature(&conv, _params.led_specs[0].white_temperature);
+            } else {
+                sb_rgbw_conversion_use_min_subtraction(&conv);
+            }
+
+            rgbw_color = sb_rgb_color_to_rgbw(color, conv);
+            _rgb_led->set_rgbw(rgbw_color.red, rgbw_color.green, rgbw_color.blue, rgbw_color.white);
         } else {
+            // Code path for standard RGB LEDs
             _rgb_led->set_rgb(color.red, color.green, color.blue);
         }
     }
