@@ -22,7 +22,7 @@ public:
     bool init(void) override;
 
 protected:
-    bool set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue) override;
+    bool set_raw_rgbw(uint8_t red, uint8_t green, uint8_t blue, uint8_t white) override;
 
 private:
     /** The index of the I2C bus */

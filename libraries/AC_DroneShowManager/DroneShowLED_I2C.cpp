@@ -21,13 +21,15 @@ bool DroneShowLED_I2C::init()
     return true;
 }
 
-bool DroneShowLED_I2C::set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
+bool DroneShowLED_I2C::set_raw_rgbw(uint8_t red, uint8_t green, uint8_t blue, uint8_t white)
 {
     WITH_SEMAPHORE(_sem);
 
     _msg[0] = red;
     _msg[1] = green;
     _msg[2] = blue;
+    // white channel ignored
+
     _send_required = true;
 
     return true;

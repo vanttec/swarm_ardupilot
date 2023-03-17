@@ -14,14 +14,12 @@
  */
 class DroneShowLED_Debug : public DroneShowLED {
 public:
-    DroneShowLED_Debug();
+    DroneShowLED_Debug() : DroneShowLED() {};
 
 protected:
-    bool set_raw_rgb(uint8_t r, uint8_t g, uint8_t b) override;
+    bool set_raw_rgbw(uint8_t r, uint8_t g, uint8_t b, uint8_t w) override;
+    bool supports_white_channel() override { return true; }
 
 private:
-    uint8_t _last_red, _last_green, _last_blue;
-
     uint8_t packet_overhead() const;
-    bool try_set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue);
 };

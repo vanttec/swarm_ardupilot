@@ -23,7 +23,8 @@ public:
 
 protected:
     bool init(void) override;
-    bool set_raw_rgb(uint8_t r, uint8_t g, uint8_t b) override;
+    bool set_raw_rgbw(uint8_t r, uint8_t g, uint8_t b, uint8_t w) override;
+    bool supports_white_channel() override { return true; }
 
 private:
     uint8_t _chan;

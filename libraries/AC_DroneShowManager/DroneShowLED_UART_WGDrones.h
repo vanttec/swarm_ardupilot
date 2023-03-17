@@ -18,9 +18,10 @@ public:
     DroneShowLED_UART_WGDrones &operator=(const DroneShowLED_UART_WGDrones&) = delete;
 
 protected:
-    bool send_rgb_command_to_uart(
-        AP_HAL::UARTDriver* uart, uint8_t red, uint8_t green, uint8_t blue
+    bool send_rgbw_command_to_uart(
+        AP_HAL::UARTDriver* uart, uint8_t red, uint8_t green, uint8_t blue, uint8_t white
     ) override {
+        // white ignored
         uart->printf("$c1@%d\n$c2@%d\n$c3@%d\n", red, green, blue);
         return true;
     }

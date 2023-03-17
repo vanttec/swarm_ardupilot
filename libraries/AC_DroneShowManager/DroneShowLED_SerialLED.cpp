@@ -23,11 +23,12 @@ bool DroneShowLED_SerialLED::init(void)
     return false;
 }
 
-bool DroneShowLED_SerialLED::set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
+bool DroneShowLED_SerialLED::set_raw_rgbw(uint8_t red, uint8_t green, uint8_t blue, uint8_t white)
 {
     AP_SerialLED* serialLed = AP_SerialLED::get_singleton();
 
     if (serialLed) {
+        // white channel ignored
         serialLed->set_RGB(_chan, -1, red, green, blue);
         serialLed->send(_chan);
         return true;

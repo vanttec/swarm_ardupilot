@@ -25,7 +25,7 @@ public:
 
 protected:
     bool init(void) override;
-    bool set_raw_rgb(uint8_t r, uint8_t g, uint8_t b) override;
+    bool set_raw_rgbw(uint8_t r, uint8_t g, uint8_t b, uint8_t w) override;
 
     /* Sends a command to the given UART that sets the given RGB values on
      * the LED. Must be overridden in subclasses. uart is guaranteed not to
@@ -35,7 +35,7 @@ protected:
      * means that we will attempt to re-send the same command in the next
      * iteration.
      */
-    virtual bool send_rgb_command_to_uart(AP_HAL::UARTDriver* uart, uint8_t r, uint8_t g, uint8_t b) = 0;
+    virtual bool send_rgbw_command_to_uart(AP_HAL::UARTDriver* uart, uint8_t r, uint8_t g, uint8_t b, uint8_t w) = 0;
 
 private:
     uint8_t _uart_index;

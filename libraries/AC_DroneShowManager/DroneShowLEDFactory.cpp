@@ -10,8 +10,8 @@
 #include "DroneShowLED_I2C.h"
 #include "DroneShowLED_MAVLink.h"
 #include "DroneShowLED_NeoPixel_RGBW.h"
-#include "DroneShowLED_RGB.h"
 #include "DroneShowLED_SerialLED.h"
+#include "DroneShowLED_Servo.h"
 #include "DroneShowLED_UART_WGDrones.h"
 
 /// Default constructor.
@@ -22,9 +22,7 @@ DroneShowLEDFactory::DroneShowLEDFactory()
 DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(
     DroneShowLEDType type, uint8_t channel, uint8_t num_leds, float gamma
 ) {
-    uint8_t chan_red, chan_green, chan_blue;
-    RGBLed* rgb_led = NULL;
-
+    uint8_t chan_red, chan_green, chan_blue, chan_white;
     DroneShowLED* result = NULL;
 
     switch (type) {
@@ -47,11 +45,13 @@ DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(
                 SRV_Channels::find_channel(SRV_Channel::k_scripting15, chan_green) &&
                 SRV_Channels::find_channel(SRV_Channel::k_scripting16, chan_blue)
             ) {
-                if (type == DroneShowLEDType_InvertedServo) {
-                    rgb_led = new RCOutputRGBLedInverted(chan_red, chan_green, chan_blue);
-                } else {
-                    rgb_led = new RCOutputRGBLed(chan_red, chan_green, chan_blue);
+                if (!SRV_Channels::find_channel(SRV_Channel::k_scripting13, chan_white)) {
+                    chan_white = 255;
                 }
+                result = new DroneShowLED_Servo(
+                    chan_red, chan_green, chan_blue, chan_white,
+                    type == DroneShowLEDType_InvertedServo
+                );
             }
             break;
 
@@ -82,17 +82,6 @@ DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(
 
         default:
             break;
-    }
-
-    if (rgb_led) {
-        // Connect the RGB led instance to the notification manager to prevent
-        // crashes when RGBLed->set_rgb() tries to access it
-        rgb_led->pNotify = &AP::notify();
-    }
-
-    if (rgb_led) {
-        // Ownership of rgb_led now taken by the DroneShowLED_RGB instance
-        result = new DroneShowLED_RGB(rgb_led);
     }
 
     if (result && !result->init()) {

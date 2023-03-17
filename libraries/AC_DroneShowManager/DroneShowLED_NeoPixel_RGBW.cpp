@@ -27,13 +27,10 @@ bool DroneShowLED_NeoPixel_RGBW::init(void)
     return serialLed->set_num_neopixel(_chan, _virtual_num_leds);
 }
 
-bool DroneShowLED_NeoPixel_RGBW::set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
+bool DroneShowLED_NeoPixel_RGBW::set_raw_rgbw(uint8_t red, uint8_t green, uint8_t blue, uint8_t white)
 {
     AP_SerialLED* serialLed = AP_SerialLED::get_singleton();
-    uint8_t i, white;
-
-    // TODO(ntamas): do proper RGB --> RGBW conversion
-    white = 0;
+    uint8_t i;
 
     if (serialLed) {
         // The pattern to be sent repeats itself after every 4th LED.

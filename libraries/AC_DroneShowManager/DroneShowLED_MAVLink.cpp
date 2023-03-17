@@ -24,9 +24,11 @@ bool DroneShowLED_MAVLink::init()
     }
 }
 
-bool DroneShowLED_MAVLink::set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue)
+bool DroneShowLED_MAVLink::set_raw_rgbw(uint8_t red, uint8_t green, uint8_t blue, uint8_t white)
 {
     mavlink_channel_t chan = _chan;
+
+    // white channel ignored
 
     if (valid_channel(chan) && mavlink_comm_port[chan] != 0) {
         CHECK_PAYLOAD_SIZE2(DEBUG_VECT);

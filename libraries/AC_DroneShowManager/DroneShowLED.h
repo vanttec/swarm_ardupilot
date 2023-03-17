@@ -23,7 +23,7 @@ private:
     /**
      * Last RGB components that were sent on this LED.
      */
-    uint8_t _last_red, _last_green, _last_blue;
+    uint8_t _last_red, _last_green, _last_blue, _last_white;
 
     /**
      * Number of times we need to repeat LED commands.
@@ -37,7 +37,8 @@ private:
 
 public:
     DroneShowLED() :
-        _gamma(0.0f), _last_red(0.0f), _last_green(0.0f), _last_blue(0.0f), _repeat_count(0)
+        _gamma(0.0f), _last_red(0), _last_green(0), _last_blue(0), _last_white(0),
+        _repeat_count(0), _repeat_count_left(0)
     {
         set_gamma(1.0f);
         set_repeat_count(1);
@@ -79,21 +80,42 @@ public:
     }
 
     /**
-     * Sets the color of the LED.
+     * Sets the color of the LED in RGB space. The value of the white channel
+     * is assumed to be zero.
      * 
      * Red, green and blue channel values used in this function are _before_
      * gamma correction. The function will apply gamma correction on its own.
      */
     void set_rgb(uint8_t red, uint8_t green, uint8_t blue) {
-        if (red != _last_red || green != _last_green || blue != _last_blue) {
+        set_rgbw(red, green, blue, 0);
+    }
+
+    /**
+     * Sets the color of the LED in RGBW space.
+     * 
+     * Red, green, blue and white channel values used in this function are
+     * _before_ gamma correction. The function will apply gamma correction on
+     * its own.
+     */
+    void set_rgbw(uint8_t red, uint8_t green, uint8_t blue, uint8_t white) {
+        if (red != _last_red || green != _last_green || blue != _last_blue || white != _last_white) {
             _last_red = red;
             _last_green = green;
             _last_blue = blue;
+            _last_white = white;
             _reset_repeat_count();
         }
 
         repeat_last_command_if_needed();
     }
+
+    /**
+     * Returns whether the LED supports the W channel. LEDs that do not support
+     * the W channel will ignore whatever value is sent to them on the white
+     * channel. It is the responsibility of the caller to ensure that the W
+     * channel is not used if this function returns false.
+     */
+    virtual bool supports_white_channel() { return false; }
 
     /**
      * Repeats the last command to set the color of the RGB LED if needed.
@@ -103,10 +125,11 @@ public:
             return;
         }
 
-        if (set_raw_rgb(
+        if (set_raw_rgbw(
             _gamma_lookup_table[_last_red],
             _gamma_lookup_table[_last_green],
-            _gamma_lookup_table[_last_blue]
+            _gamma_lookup_table[_last_blue],
+            _gamma_lookup_table[_last_white]
         )) {
             _repeat_count_left--;
         }
@@ -114,15 +137,15 @@ public:
 
 protected:
     /**
-     * Sets the raw color of the LED.
+     * Sets the raw color of the LED in RGBW space.
      * 
-     * Red, green and blue channel values used in this function are _after_
-     * gamma correction. The function will simply forward them to the appropriate
-     * output device.
+     * Red, green, blue and white channel values used in this function are
+     * _after_ gamma correction. The function will simply forward them to the
+     * appropriate output device.
      * 
      * Returns whether the new color was set successfully.
      */
-    virtual bool set_raw_rgb(uint8_t red, uint8_t green, uint8_t blue) = 0;
+    virtual bool set_raw_rgbw(uint8_t red, uint8_t green, uint8_t blue, uint8_t white) = 0;
 
 private:
     /**
