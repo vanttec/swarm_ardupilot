@@ -13,13 +13,14 @@ class DroneShowLED_I2C : public DroneShowLED {
 
 public:
     /// Constructor
-    DroneShowLED_I2C(uint8_t bus, uint8_t addr);
+    DroneShowLED_I2C(uint8_t bus, uint8_t addr, bool use_white_channel = false);
 
     /* Do not allow copies */
     DroneShowLED_I2C(const DroneShowLED_I2C &other) = delete;
     DroneShowLED_I2C &operator=(const DroneShowLED_I2C&) = delete;
 
     bool init(void) override;
+    bool supports_white_channel() override { return _use_white_channel; }
 
 protected:
     bool set_raw_rgbw(uint8_t red, uint8_t green, uint8_t blue, uint8_t white) override;
@@ -39,12 +40,17 @@ private:
     HAL_Semaphore _sem;
 
     /** Storage for the message that we are about to send on the I2C bus.
-     * Protected by the semaphore. */
-    uint8_t _msg[3];
+     * Protected by the semaphore. Uses 4 bytes because we anticipate RGBW
+     * LEDs, although we may transfer only 3 bytes if we are configured not
+     * to use the W channel */
+    uint8_t _msg[4];
 
     /** Stores whether a new command has to be sent on the I2C bus to change the
      * LED state */
     bool _send_required;
+
+    /** Stores whether we should send the W channel */
+    bool _use_white_channel;
 
     void _timer(void);
 };

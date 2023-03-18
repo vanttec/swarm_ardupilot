@@ -2,9 +2,9 @@
 
 extern const AP_HAL::HAL& hal;
 
-DroneShowLED_I2C::DroneShowLED_I2C(uint8_t bus, uint8_t addr)
+DroneShowLED_I2C::DroneShowLED_I2C(uint8_t bus, uint8_t addr, bool use_white_channel)
     : DroneShowLED(),
-    _bus(bus), _addr(addr), _send_required(false)
+    _bus(bus), _addr(addr), _send_required(false), _use_white_channel(use_white_channel)
 {
 }
 
@@ -28,7 +28,7 @@ bool DroneShowLED_I2C::set_raw_rgbw(uint8_t red, uint8_t green, uint8_t blue, ui
     _msg[0] = red;
     _msg[1] = green;
     _msg[2] = blue;
-    // white channel ignored
+    _msg[3] = white;
 
     _send_required = true;
 
@@ -37,7 +37,8 @@ bool DroneShowLED_I2C::set_raw_rgbw(uint8_t red, uint8_t green, uint8_t blue, ui
 
 void DroneShowLED_I2C::_timer(void)
 {
-    uint8_t msg[3];
+    uint8_t msg[4];
+    uint8_t to_send = _use_white_channel ? 4 : 3;
 
     WITH_SEMAPHORE(_sem);
 
@@ -48,5 +49,5 @@ void DroneShowLED_I2C::_timer(void)
     _send_required = false;
     memcpy(msg, _msg, sizeof(msg));
 
-    _dev->transfer(msg, sizeof(msg), nullptr, 0);
+    _dev->transfer(msg, to_send, nullptr, 0);
 }

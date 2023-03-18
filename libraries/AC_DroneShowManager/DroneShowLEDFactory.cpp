@@ -64,8 +64,9 @@ DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(
             break;
 
         case DroneShowLEDType_I2C:
+        case DroneShowLEDType_I2C_RGBW:
             /* channel is the 7-bit I2C address, count is (ab)used as the I2C bus */
-            result = new DroneShowLED_I2C(num_leds, channel);
+            result = new DroneShowLED_I2C(num_leds, channel, type == DroneShowLEDType_I2C_RGBW);
             break;
 
         case DroneShowLEDType_Debug:

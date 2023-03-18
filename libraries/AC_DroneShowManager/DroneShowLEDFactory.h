@@ -28,7 +28,7 @@ enum DroneShowLEDType {
     // LED light is attached to servo channels
     DroneShowLEDType_Servo = 6,
 
-    // LED light is driven over an I2C bus
+    // LED light is driven over an I2C bus with 3 bytes per transfer (RGB)
     DroneShowLEDType_I2C = 7,
 
     // LED light is attached to servo channels with inverted polarity
@@ -39,6 +39,9 @@ enum DroneShowLEDType {
 
     // LED light is to be forwarded to a NeoPixel RGBW LED strip
     DroneShowLEDType_NeoPixel_RGBW = 10,
+
+    // LED light is driven over an I2C bus with 4 bytes per transfer (RGBW)
+    DroneShowLEDType_I2C_RGBW = 11,
 };
 
 class DroneShowLEDFactory
