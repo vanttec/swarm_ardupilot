@@ -56,4 +56,5 @@ private:
     static AP_PowerManagement *_singleton;
 
     AP_Int8 backend_type;
+    AP_Int8 channel;
 };

@@ -22,7 +22,8 @@
 class AP_PowerManagement_WGDrones : public AP_PowerManagement_UART
 {
 public:
-    AP_PowerManagement_WGDrones(AP_PowerManagement& frontend) : AP_PowerManagement_UART(frontend, 2) {}
+    AP_PowerManagement_WGDrones(AP_PowerManagement& frontend, uint8_t uart_index) :
+        AP_PowerManagement_UART(frontend, uart_index) {}
 
     virtual MAV_RESULT handle_preflight_reboot(const mavlink_command_long_t &packet) override;
 

@@ -13,9 +13,14 @@ const AP_Param::GroupInfo AP_PowerManagement::var_info[] = {
     // @DisplayName: Set type of power management module
     // @Description: The type of power management module on the vehicle.
     // @Values: 0:None,1:WGDrones
-
     // @User: Advanced
-    AP_GROUPINFO_FLAGS("TYPE",  1, AP_PowerManagement, backend_type, 0, AP_PARAM_FLAG_ENABLE),
+    AP_GROUPINFO("TYPE",  1, AP_PowerManagement, backend_type, PM_TYPE_NONE),
+
+    // @Param: CHAN
+    // @DisplayName: Set channel index of power management module
+    // @Description: The channel index of power management module on the vehicle.
+    // @User: Advanced
+    AP_GROUPINFO("CHAN",  2, AP_PowerManagement, channel, 0),
 
     AP_GROUPEND
 };
@@ -34,11 +39,9 @@ AP_PowerManagement::AP_PowerManagement(void)
 
 bool AP_PowerManagement::init(void)
 {
-    hal.console->printf("AP_PM inited\n");
-
     switch (backend_type) {
     case PM_TYPE_WGDRONES:
-        _backend = new AP_PowerManagement_WGDrones(*this);
+        _backend = new AP_PowerManagement_WGDrones(*this, channel);
         break;
     default:
         break;
