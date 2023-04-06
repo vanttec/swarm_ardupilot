@@ -42,6 +42,9 @@ enum DroneShowLEDType {
 
     // LED light is driven over an I2C bus with 4 bytes per transfer (RGBW)
     DroneShowLEDType_I2C_RGBW = 11,
+
+    // LED light is driven by ArduPilot's AP_Notify framework
+    DroneShowLEDType_Notify = 12,
 };
 
 class DroneShowLEDFactory

@@ -10,6 +10,7 @@
 #include "DroneShowLED_I2C.h"
 #include "DroneShowLED_MAVLink.h"
 #include "DroneShowLED_NeoPixel_RGBW.h"
+#include "DroneShowLED_Notify.h"
 #include "DroneShowLED_SerialLED.h"
 #include "DroneShowLED_Servo.h"
 #include "DroneShowLED_UART_WGDrones.h"
@@ -79,6 +80,10 @@ DroneShowLED* DroneShowLEDFactory::new_rgb_led_by_type(
 
         case DroneShowLEDType_NeoPixel_RGBW:
             result = new DroneShowLED_NeoPixel_RGBW(channel, num_leds);
+            break;
+
+        case DroneShowLEDType_Notify:
+            result = new DroneShowLED_Notify();
             break;
 
         default:
