@@ -1176,6 +1176,9 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // work. Don't try it; the value of the variable at index 3 in this group
     // will be lost every time the drone is rebooted.
     AP_SUBGROUPINFO(drone_show_manager, "SHOW_", 62, ParametersG2, AC_DroneShowManager),
+
+    // This is temporary
+    AP_SUBGROUPINFO(drone_show_manager.power_mgmt, "PM_", 61, ParametersG2, AP_PowerManagement),
 #endif
 
     AP_GROUPEND

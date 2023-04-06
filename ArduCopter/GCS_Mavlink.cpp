@@ -663,10 +663,18 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_do_set_roi(const Location &roi_loc
 
 MAV_RESULT GCS_MAVLINK_Copter::handle_preflight_reboot(const mavlink_command_long_t &packet)
 {
+    MAV_RESULT result;
+
     // reject reboot if user has also specified they want the "Auto" ESC calibration on next reboot
     if (copter.g.esc_calibrate == (uint8_t)Copter::ESCCalibrationModes::ESCCAL_AUTO) {
         send_text(MAV_SEVERITY_CRITICAL, "Reboot rejected, ESC cal on reboot");
         return MAV_RESULT_FAILED;
+    }
+
+    // allow power management subsystem to chime in
+    result = copter.g2.drone_show_manager.power_mgmt.handle_preflight_reboot(packet);
+    if (result != MAV_RESULT_UNSUPPORTED) {
+        return result;
     }
 
     // call parent

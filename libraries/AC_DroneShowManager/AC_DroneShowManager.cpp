@@ -414,6 +414,9 @@ void AC_DroneShowManager::init(const AC_WPNav* wp_nav)
     AP_Int16* boot_count_param = static_cast<AP_Int16*>(AP_Param::find("STAT_BOOTCNT", &ptype));
     _boot_count = boot_count_param ? (*boot_count_param) : 0;
 
+    // Initialize power management subsystem
+    power_mgmt.init();
+
     // Get a reference to the RGB LED factory
     _rgb_led_factory = &_rgb_led_factory_singleton;
 

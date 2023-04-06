@@ -8,6 +8,7 @@
 #include <AP_Math/AP_Math.h>
 #include <AP_Notify/RGBLed.h>
 #include <AP_Param/AP_Param.h>
+#include <AP_PowerManagement/AP_PowerManagement.h>
 
 #include <AC_HardFence/AC_HardFence.h>
 #include <AC_WPNav/AC_WPNav.h>
@@ -448,6 +449,10 @@ public:
     // ourselves to the SHOW_ parameter group only, and that one is managed by
     // AC_DroneShowManager.
     AC_HardFence hard_fence;
+
+    // Power management subsystem. This should really have to be in Copter or some
+    // other top-level class.
+    AP_PowerManagement power_mgmt;
 
     // Takeoff speed; we assume that the drone attempts to take off with this
     // vertical speed if WPNAV_SPEED_UP seems invalid
