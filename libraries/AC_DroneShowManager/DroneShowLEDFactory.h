@@ -58,11 +58,10 @@ public:
 
     /**
      * Creates a new DroneShowLED instance, given the LED type, the channel
-     * index (if the LED type support multiple channels), the number of
-     * LEDs on this channel (for NeoPixel or ProfiLED strips) and the
-     * gamma correction factor.
+     * index (if the LED type support multiple channels), and the number of
+     * LEDs on this channel (for NeoPixel or ProfiLED strips).
      */
     DroneShowLED* new_rgb_led_by_type(
-        DroneShowLEDType type, uint8_t channel, uint8_t num_leds, float gamma
+        DroneShowLEDType type, uint8_t channel, uint8_t num_leds
     );
 };
