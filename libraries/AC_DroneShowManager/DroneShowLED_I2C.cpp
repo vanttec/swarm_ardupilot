@@ -37,17 +37,15 @@ bool DroneShowLED_I2C::set_raw_rgbw(uint8_t red, uint8_t green, uint8_t blue, ui
 
 void DroneShowLED_I2C::_timer(void)
 {
-    uint8_t msg[4];
     uint8_t to_send = _use_white_channel ? 4 : 3;
-
-    WITH_SEMAPHORE(_sem);
 
     if (!_send_required) {
         return;
     }
 
-    _send_required = false;
-    memcpy(msg, _msg, sizeof(msg));
+    WITH_SEMAPHORE(_sem);
 
-    _dev->transfer(msg, to_send, nullptr, 0);
+    _send_required = false;
+
+    _dev->transfer(_msg, to_send, nullptr, 0);
 }
