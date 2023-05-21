@@ -2262,23 +2262,49 @@ void AC_DroneShowManager::_update_lights()
 
 void AC_DroneShowManager::_update_rgb_led_instance()
 {
-    if (_rgb_led)
-    {
-        _rgb_led->set_rgb(0, 0, 0);
+    static int previous_led_type = -1;
+    static uint8_t previous_channel = 255;
+    static uint8_t previous_num_leds = 0;
 
-        delete _rgb_led;
-        _rgb_led = NULL;
-    }
+    // We need to avoid the re-creation of _rgb_led if the type of the LED did
+    // not change because it causes problems with I2C LEDs on a MatekH743 Slim,
+    // leading to watchdog timeouts
 
     if (_rgb_led_factory) {
         int led_type = _params.led_specs[0].type;
         uint8_t channel = _params.led_specs[0].channel;
         uint8_t num_leds = _params.led_specs[0].count;
-        float gamma = _params.led_specs[0].gamma;
 
-        _rgb_led = _rgb_led_factory->new_rgb_led_by_type(
-            static_cast<DroneShowLEDType>(led_type), channel, num_leds, gamma
-        );
+        if (
+            led_type != previous_led_type ||
+            channel != previous_channel ||
+            num_leds != previous_num_leds
+        ) {
+            // Turn off the old RGB LED
+            if (_rgb_led)
+            {
+                _rgb_led->set_rgb(0, 0, 0);
+
+                delete _rgb_led;
+                _rgb_led = NULL;
+            }
+
+            // Construct the new LED
+            _rgb_led = _rgb_led_factory->new_rgb_led_by_type(
+                static_cast<DroneShowLEDType>(led_type), channel, num_leds
+            );
+
+            // Store the settings
+            previous_led_type = led_type;
+            previous_channel = channel;
+            previous_num_leds = num_leds;
+        }
+    }
+
+    if (_rgb_led) {
+        // Update gamma correction parameter of LED
+        float gamma = _params.led_specs[0].gamma;
+        _rgb_led->set_gamma(gamma);
     }
 }
 
