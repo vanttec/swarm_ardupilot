@@ -1006,7 +1006,7 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
     const AP_GPS& gps = AP::gps();
 
     uint8_t packet[16] = { 0x62, };
-    uint8_t flags, flags2, gps_health;
+    uint8_t flags, flags2, flags3, gps_health;
     float elapsed_time;
     int16_t encoded_elapsed_time;
     int32_t encoded_start_time;
@@ -1058,6 +1058,9 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
     }
     gps_health |= (gps.num_sats() > 31 ? 31 : gps.num_sats()) << 3;
 
+    /* calculate third byte of status flags */
+    flags3 = _boot_count & 0x03;
+
     /* calculate elapsed time */
     elapsed_time = get_elapsed_time_since_start_sec();
     if (elapsed_time > 32767) {
@@ -1079,7 +1082,7 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
     packet[6] = flags;
     packet[7] = flags2;
     packet[8] = gps_health;
-    packet[9] = _boot_count & 0x03; // upper 6 bits are unused yet
+    packet[9] = flags3;
     memcpy(packet + 10, &encoded_elapsed_time, sizeof(encoded_elapsed_time));
 
     mavlink_msg_data16_send(
@@ -1622,20 +1625,11 @@ bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& m
 
 bool AC_DroneShowManager::_is_at_takeoff_position() const
 {
-    Location current_loc;
     Location takeoff_loc;
-    float xy_threshold;
     
     if (!_tentative_show_coordinate_system.is_valid())
     {
         // User did not set up the takeoff position yet
-        return false;
-    }
-
-    if (!get_current_location(current_loc))
-    {
-        // EKF does not know its own position yet so we report that we are not
-        // at the takeoff position as it would not be safe to take off anyway
         return false;
     }
 
@@ -1645,8 +1639,31 @@ bool AC_DroneShowManager::_is_at_takeoff_position() const
         return false;
     }
 
+    return _is_close_to_position(takeoff_loc);
+}
+
+bool AC_DroneShowManager::_is_close_to_position(const Location& target_loc) const
+{
+    float xy_threshold;
+    Location current_loc;
+
+    if (!get_current_location(current_loc))
+    {
+        // EKF does not know its own position yet so we report that we are not
+        // at the target position
+        return false;
+    }
+
+    // Location.get_distance() checks XY distance only so this is okay
     xy_threshold = _params.max_xy_placement_error_m;
-    return xy_threshold <= 0 || current_loc.get_distance(takeoff_loc) <= xy_threshold;
+    if (xy_threshold > 0 && current_loc.get_distance(target_loc) > xy_threshold)
+    {
+        return false;
+    }
+
+    // TODO(ntamas): add Z checks!
+
+    return true;
 }
 
 bool AC_DroneShowManager::_is_gps_time_ok() const

@@ -710,6 +710,9 @@ private:
     // Returns whether the drone is close enough to its start position
     bool _is_at_takeoff_position() const;
     
+    // Returns whether the drone is close enough to the given location
+    bool _is_close_to_position(const Location& target_loc) const;
+
     // Returns whether the GPS fix of the drone is good enough so we can trust
     // that it has accurate tiem information.
     bool _is_gps_time_ok() const;
