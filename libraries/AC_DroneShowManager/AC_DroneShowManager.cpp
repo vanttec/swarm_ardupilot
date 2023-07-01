@@ -646,6 +646,24 @@ void AC_DroneShowManager::get_desired_acceleration_neu_in_cms_per_seconds_square
     acc.z = vec.z / 10.0f;
 }
 
+void AC_DroneShowManager::get_distance_from_desired_position(Vector3f& vec) const
+{
+    if (_stage_in_drone_show_mode == DroneShow_Performing) {
+        if (!get_current_relative_position_NED_origin(vec)) {
+            // EKF does not know its own position yet
+            vec.zero();
+        } else {
+            // Setpoints are in centimeters, so we need to convert the units.
+            // Furthermore, the relative position is given in NED but the
+            // setpoint is in NEU so we need to invert the Z axis.
+            vec.z *= -1;
+            vec -= (_last_setpoint.pos / 100.0f);
+        }
+    } else {
+        vec.zero();
+    }
+}
+
 // returns the elapsed time since the start of the show, in microseconds
 int64_t AC_DroneShowManager::get_elapsed_time_since_start_usec() const
 {
@@ -951,6 +969,12 @@ void AC_DroneShowManager::notify_drone_show_mode_exited()
     _cancel_requested = false;
     _update_rgb_led_instance();
     _clear_start_time_if_set_by_switch();
+    _clear_last_setpoint();
+}
+
+void AC_DroneShowManager::notify_guided_mode_command_sent(const GuidedModeCommand& command)
+{
+    _last_setpoint = command;   
 }
 
 void AC_DroneShowManager::notify_landed()
@@ -1058,8 +1082,14 @@ void AC_DroneShowManager::send_drone_show_status(const mavlink_channel_t chan) c
     }
     gps_health |= (gps.num_sats() > 31 ? 31 : gps.num_sats()) << 3;
 
-    /* calculate third byte of status flags */
+    /* calculate third byte of status flags.
+     * Currently we use bits 0 and 1 for encoding the boot count modulo 4,
+     * and bit 7 to indicate that the drone has deviated from its expected
+     * position. */
     flags3 = _boot_count & 0x03;
+    if (!_is_at_expected_position()) {
+        flags3 |= (1 << 7);
+    }
 
     /* calculate elapsed time */
     elapsed_time = get_elapsed_time_since_start_sec();
@@ -1305,6 +1335,14 @@ void AC_DroneShowManager::_check_radio_failsafe()
         // of range, user changes the switch, then the drone reconnects)
         _rc_switches_blocked_until = AP_HAL::millis() + 1000;
     }
+}
+
+void AC_DroneShowManager::_clear_last_setpoint()
+{
+    _last_setpoint.acc.zero();
+    _last_setpoint.vel.zero();
+    _last_setpoint.pos.zero();
+    _last_setpoint.unlock_altitude = false;
 }
 
 void AC_DroneShowManager::_clear_start_time_after_landing()
@@ -1621,6 +1659,18 @@ bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& m
     }
 
     return true;
+}
+
+bool AC_DroneShowManager::_is_at_expected_position() const
+{
+    if (_stage_in_drone_show_mode != DroneShow_Performing)
+    {
+        // Not performing a show; any position is suitable
+        return true;
+    }
+
+    Location expected_loc(_last_setpoint.pos.tofloat(), Location::AltFrame::ABOVE_ORIGIN);
+    return _is_close_to_position(expected_loc);
 }
 
 bool AC_DroneShowManager::_is_at_takeoff_position() const

@@ -6,8 +6,11 @@
 void AC_DroneShowManager::write_log_message() const
 {
     sb_rgb_color_t color;
-    get_last_rgb_led_color(color);
+    Vector3f dist;
 
+    get_last_rgb_led_color(color);
+    get_distance_from_desired_position(dist);
+    
     const struct log_DroneShowStatus pkt {
         LOG_PACKET_HEADER_INIT(LOG_DRONE_SHOW_MSG),
         time_us         : AP_HAL::micros64(),
@@ -16,6 +19,8 @@ void AC_DroneShowManager::write_log_message() const
         red             : color.red,
         green           : color.green,
         blue            : color.blue,
+        h_dist          : hypotf(dist.x, dist.y),
+        v_dist          : dist.z,
     };
 
     AP::logger().WriteBlock(&pkt, sizeof(pkt));

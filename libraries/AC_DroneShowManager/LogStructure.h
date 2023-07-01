@@ -13,6 +13,8 @@
 // @Field: R: Red component of current color in show
 // @Field: G: Green component of current color in show
 // @Field: B: Blue component of current color in show
+// @Field: HDist: Horizontal distance from desired position
+// @Field: VDist: Vertical distance from desired position
 
 // drone show mode logging
 struct PACKED log_DroneShowStatus {
@@ -23,8 +25,10 @@ struct PACKED log_DroneShowStatus {
     uint8_t red;
     uint8_t green;
     uint8_t blue;
+    float h_dist;
+    float v_dist;
 };
 
 #define LOG_STRUCTURE_FROM_DRONE_SHOW \
     { LOG_DRONE_SHOW_MSG, sizeof(log_DroneShowStatus),                  \
-      "SHOW", "QiBBBB", "TimeUS,ClockMS,Stage,R,G,B", "ss----", "FC----" }
+      "SHOW", "QiBBBBff", "TimeUS,ClockMS,Stage,R,G,B,HDist,VDist", "ss----mm", "FC----BB" }

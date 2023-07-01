@@ -13,6 +13,11 @@ bool AC_DroneShowManager_Copter::get_current_location(Location& loc) const
     return copter.ahrs.get_location(loc);
 }
 
+bool AC_DroneShowManager_Copter::get_current_relative_position_NED_origin(Vector3f& vec) const
+{
+    return copter.ahrs.get_relative_position_NED_origin(vec);
+}
+
 void AC_DroneShowManager_Copter::_request_switch_to_show_mode()
 {
     // Drone show manager requested the copter to switch to show mode. We do this
@@ -903,6 +908,8 @@ bool ModeDroneShow::send_guided_mode_command_during_performance()
         if (command.unlock_altitude) {
             _altitude_locked_above_takeoff_altitude = false;
         }
+
+        copter.g2.drone_show_manager.notify_guided_mode_command_sent(command);
 
         return true;
     } else {

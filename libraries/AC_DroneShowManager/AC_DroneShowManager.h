@@ -204,8 +204,12 @@ public:
         bool altitude_locked_above_takeoff_altitude = false
     ) WARN_IF_UNUSED;
 
-    // Retrieves the current location of the vehicle from the EKF
+    // Retrieves the current absolute location of the vehicle from the EKF
     virtual bool get_current_location(Location& loc) const { return false; }
+
+    // Retrieves the current location of the vehicle from the EKF, relative to
+    // the EKF origin, in meters
+    virtual bool get_current_relative_position_NED_origin(Vector3f& vec) const { return false; }
 
     // Returns the desired position of the drone during the drone show the
     // given number of seconds after the start time, in the global coordinate
@@ -221,6 +225,10 @@ public:
     // given number of seconds after the start time, in the global NEU
     // cooordinate system, using centimeters per seconds squared as units.
     void get_desired_acceleration_neu_in_cms_per_seconds_squared_at_seconds(float time, Vector3f& acc);
+
+    // Returns the distance of the drone from its desired position during the
+    // "Performing" stage of the show. Returns zero distance when not doing a show.
+    void get_distance_from_desired_position(Vector3f& vec) const;
 
     // Retrieves the position where the drone is supposed to be at the start of the show.
     // Returns true if successful or false if the show coordinate system was not set up
@@ -379,6 +387,9 @@ public:
 
     // Notifies the drone show manager that the drone show mode has entered the given execution stage
     void notify_drone_show_mode_entered_stage(DroneShowModeStage stage);
+
+    // Notifies the drone show manager that a guided mode command was sent to the drone
+    void notify_guided_mode_command_sent(const GuidedModeCommand& command);
 
     // Notifies the drone show manager that the drone has landed after the show
     void notify_landed();
@@ -625,6 +636,9 @@ private:
     // Last RGB color that was sent to the RGB led
     sb_rgb_color_t _last_rgb_led_color;
 
+    // Last guided mode command that was sent
+    GuidedModeCommand _last_setpoint;
+
     // Timestamp that defines whether the RC start switch is blocked (and if so, until when)
     uint32_t _rc_switches_blocked_until;
 
@@ -651,6 +665,9 @@ private:
     // switch until the radio returns from failsafe and at least one second
     // has passed
     void _check_radio_failsafe();
+
+    // Clears the stored last setpoint that was sent to the drone
+    void _clear_last_setpoint();
 
     // Clears the start time of the drone show after a successful landing
     void _clear_start_time_after_landing();
@@ -707,6 +724,10 @@ private:
     // Handles a MAVLink LED_CONTROL message from the ground station.
     bool _handle_led_control_message(const mavlink_message_t& msg);
 
+    // Returns whether the drone is close enough to its expected position during a show.
+    // Returns true unconditionally if the drone is not performing a show.
+    bool _is_at_expected_position() const;
+    
     // Returns whether the drone is close enough to its start position
     bool _is_at_takeoff_position() const;
     
