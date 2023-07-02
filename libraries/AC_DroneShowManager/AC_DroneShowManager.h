@@ -508,6 +508,12 @@ private:
         // Maximum allowed placement error before takeoff in the XY plane, in meters.
         AP_Float max_xy_placement_error_m;
 
+        // Maximum allowed distance between expected position and setpoint in the XY plane during show, in meters.
+        AP_Float max_xy_drift_during_show_m;
+
+        // Maximum allowed altitude difference between expected position and setpoint during show, in meters.
+        AP_Float max_z_drift_during_show_m;
+
         // Velocity feed-forward gain when velocity control is being used.
         AP_Float velocity_feedforward_gain;
 
@@ -731,8 +737,10 @@ private:
     // Returns whether the drone is close enough to its start position
     bool _is_at_takeoff_position() const;
     
-    // Returns whether the drone is close enough to the given location
-    bool _is_close_to_position(const Location& target_loc) const;
+    // Returns whether the drone is close enough to the given location. Distances
+    // are checked separately in the XY plane and in the Z direction. Negative
+    // or zero threshold means that the corresponding check is turned off.
+    bool _is_close_to_position(const Location& target_loc, float xy_threshold, float z_threshold) const;
 
     // Returns whether the GPS fix of the drone is good enough so we can trust
     // that it has accurate tiem information.

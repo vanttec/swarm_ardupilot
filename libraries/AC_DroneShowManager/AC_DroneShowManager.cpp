@@ -65,6 +65,12 @@
 // take off if it is placed farther than this distance from its takeoff position.
 #define DEFAULT_XY_PLACEMENT_ERROR_METERS 3.0f
 
+// Default horizontal trajectory drift tolerance level, in meters.
+#define DEFAULT_MAX_XY_DRIFT_METERS 3.0f
+
+// Default vertical trajectory drift tolerance level, in meters.
+#define DEFAULT_MAX_Z_DRIFT_METERS 3.0f
+
 // Group mask indicating all groups
 #define ALL_GROUPS 0
 
@@ -261,15 +267,6 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("CTRL_RATE", 14, AC_DroneShowManager, _params.control_rate_hz, DEFAULT_UPDATE_RATE_HZ),
 
-    // @Param: MAX_XY_ERR
-    // @DisplayName: Maximum placement error in XY direction
-    // @Description: Maximum placement error that we tolerate before takeoff, in meters. Zero to turn off XY placement accuracy checks.
-    // @Range: 0 20
-    // @Increment: 0.1
-    // @Units: m
-    // @User: Standard
-    AP_GROUPINFO("MAX_XY_ERR", 15, AC_DroneShowManager, _params.max_xy_placement_error_m, DEFAULT_XY_PLACEMENT_ERROR_METERS),
-
     // @Param: VEL_FF_GAIN
     // @DisplayName: Velocity feed-forward gain
     // @Description: Multiplier used when mixing the desired velocity of the drone into the velocity target of the position controller. Lower values will result in more relaxed/stable behaviour, at the price of a smoothed trajectory with rounded corners, less accuracy and more lag behind desired position. Higher values will decrease lag, make trajectory following more accurate, sharp and agressive, but might increase overshoot at corners and decrease stability if general attitude control is not tuned well.
@@ -287,6 +284,15 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @User: Advanced
     // @RebootRequired: True
     AP_GROUPINFO("TAKEOFF_ALT", 17, AC_DroneShowManager, _params.takeoff_altitude_m, DEFAULT_TAKEOFF_ALTITUDE_METERS),
+
+    // @Param: TAKEOFF_ERR
+    // @DisplayName: Maximum placement error in XY direction
+    // @Description: Maximum placement error that we tolerate before takeoff, in meters. Zero to turn off XY placement accuracy checks.
+    // @Range: 0 20
+    // @Increment: 0.1
+    // @Units: m
+    // @User: Standard
+    AP_GROUPINFO("TAKEOFF_ERR", 15, AC_DroneShowManager, _params.max_xy_placement_error_m, DEFAULT_XY_PLACEMENT_ERROR_METERS),
 
     // @Param: SYNC_MODE
     // @DisplayName: Time synchronization mode
@@ -319,7 +325,25 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("HFENCE_TO", 22, AC_DroneShowManager, hard_fence._params.timeout, 5),
 
-    // Currently used max parameter ID: 23; update this if you add more parameters.
+    // @Param: MAX_XY_ERR
+    // @DisplayName: Maximum allowed drift in XY direction during show
+    // @Description: Maximum allowed drift from planned trajectory in XY plane that we tolerate during show, in meters. Zero to turn off XY checks. Drifts exceeding the threshold will trigger a status flag but do not abort the show.
+    // @Range: 0 20
+    // @Increment: 0.1
+    // @Units: m
+    // @User: Standard
+    AP_GROUPINFO("MAX_XY_ERR", 24, AC_DroneShowManager, _params.max_xy_drift_during_show_m, DEFAULT_MAX_XY_DRIFT_METERS),
+
+    // @Param: MAX_Z_ERR
+    // @DisplayName: Maximum allowed drift in Z direction during show
+    // @Description: Maximum allowed drift from planned trajectory in Z direction that we tolerate during show, in meters. Zero to turn off Z checks. Drifts exceeding the threshold will trigger a status flag but do not abort the show.
+    // @Range: 0 20
+    // @Increment: 0.1
+    // @Units: m
+    // @User: Standard
+    AP_GROUPINFO("MAX_Z_ERR", 25, AC_DroneShowManager, _params.max_z_drift_during_show_m, DEFAULT_MAX_Z_DRIFT_METERS),
+
+    // Currently used max parameter ID: 25; update this if you add more parameters.
     // Note that the max parameter ID may appear in the middle of the above list.
 
     AP_GROUPEND
@@ -1670,7 +1694,10 @@ bool AC_DroneShowManager::_is_at_expected_position() const
     }
 
     Location expected_loc(_last_setpoint.pos.tofloat(), Location::AltFrame::ABOVE_ORIGIN);
-    return _is_close_to_position(expected_loc);
+    return _is_close_to_position(
+        expected_loc, _params.max_xy_drift_during_show_m,
+        _params.max_z_drift_during_show_m
+    );
 }
 
 bool AC_DroneShowManager::_is_at_takeoff_position() const
@@ -1689,29 +1716,37 @@ bool AC_DroneShowManager::_is_at_takeoff_position() const
         return false;
     }
 
-    return _is_close_to_position(takeoff_loc);
+    return _is_close_to_position(takeoff_loc, _params.max_xy_placement_error_m, 0);
 }
 
-bool AC_DroneShowManager::_is_close_to_position(const Location& target_loc) const
+bool AC_DroneShowManager::_is_close_to_position(
+    const Location& target_loc, float xy_threshold, float z_threshold
+) const
 {
-    float xy_threshold;
     Location current_loc;
+    ftype alt_dist;
 
-    if (!get_current_location(current_loc))
-    {
+    if (!get_current_location(current_loc)) {
         // EKF does not know its own position yet so we report that we are not
         // at the target position
         return false;
     }
 
     // Location.get_distance() checks XY distance only so this is okay
-    xy_threshold = _params.max_xy_placement_error_m;
-    if (xy_threshold > 0 && current_loc.get_distance(target_loc) > xy_threshold)
-    {
+    if (xy_threshold > 0 && current_loc.get_distance(target_loc) > xy_threshold) {
         return false;
     }
 
-    // TODO(ntamas): add Z checks!
+    if (z_threshold > 0) {
+        if (!current_loc.get_alt_distance(target_loc, alt_dist)) {
+            // Altitude frame is not usable; this should not happen
+            return false;
+        }
+
+        if (alt_dist > z_threshold) {
+            return false;
+        }
+    }
 
     return true;
 }
