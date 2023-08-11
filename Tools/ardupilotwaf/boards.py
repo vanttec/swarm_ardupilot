@@ -262,6 +262,10 @@ class Board:
             env.DEFINES.update(
                 HAL_DEBUG_BUILD = 1,
             )
+        elif cfg.options.g:
+            env.CFLAGS += [
+                '-g',
+            ]
         if cfg.env.COVERAGE:
             env.CFLAGS += [
                 '-fprofile-arcs',
