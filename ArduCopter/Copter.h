@@ -179,6 +179,17 @@
 
 #include "mode.h"
 
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+ #include "mode_drone_show.h"
+ #if AP_FENCE_ENABLED
+  #include <AC_HardFence/AC_HardFence.h>
+ #endif
+#endif
+
+#if COLLMOT_EXTENSIONS_ENABLED == ENABLED
+#include "collmot_flockctrl.h"
+#endif
+
 class Copter : public AP_Vehicle {
 public:
     friend class GCS_MAVLINK_Copter;
@@ -187,6 +198,10 @@ public:
     friend class Parameters;
     friend class ParametersG2;
     friend class AP_Avoidance_Copter;
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    friend class AC_DroneShowManager_Copter;
+#endif
 
 #if ADVANCED_FAILSAFE == ENABLED
     friend class AP_AdvancedFailsafe_Copter;
@@ -225,6 +240,10 @@ public:
     friend class ModeZigZag;
     friend class ModeAutorotate;
     friend class ModeTurtle;
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    friend class ModeDroneShow;
+#endif
 
     Copter(void);
 
@@ -547,6 +566,11 @@ private:
     AP_Avoidance_Copter avoidance_adsb{adsb};
 #endif
 
+#if COLLMOT_EXTENSIONS_ENABLED == ENABLED
+    // CollMot-specific modifications
+    CollMotFlockCtrl collmot;
+#endif
+
     // last valid RC input time
     uint32_t last_radio_update_ms;
 
@@ -843,6 +867,10 @@ private:
     void Log_Write_Vehicle_Startup_Messages();
     void log_init(void);
 
+#if MODE_DRONE_SHOW_ENABLED == ENABLED && AP_FENCE_ENABLED
+    void hard_fence_check();
+#endif
+
     // mode.cpp
     bool set_mode(Mode::Number mode, ModeReason reason);
     bool set_mode(const uint8_t new_mode, const ModeReason reason) override;
@@ -1022,6 +1050,9 @@ private:
 #endif
 #if MODE_TURTLE_ENABLED == ENABLED
     ModeTurtle mode_turtle;
+#endif
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    ModeDroneShow mode_drone_show;
 #endif
 
     // mode.cpp

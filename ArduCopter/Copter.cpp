@@ -238,6 +238,9 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
 #ifdef USERHOOK_FASTLOOP
     SCHED_TASK(userhook_FastLoop,    100,     75, 153),
 #endif
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    SCHED_TASK_CLASS(AC_DroneShowManager, (AC_DroneShowManager*)&copter.g2.drone_show_manager, update, 50, 100, 155),
+#endif
 #ifdef USERHOOK_50HZLOOP
     SCHED_TASK(userhook_50Hz,         50,     75, 156),
 #endif
@@ -586,6 +589,11 @@ void Copter::twentyfive_hz_logging()
         gyro_fft.write_log_messages();
     }
 #endif
+
+#if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // log the current show state
+    g2.drone_show_manager.write_log_message();
+#endif
 }
 
 // three_hz_loop - 3.3hz loop
@@ -603,6 +611,13 @@ void Copter::three_hz_loop()
 #if AP_FENCE_ENABLED
     // check if we have breached a fence
     fence_check();
+  #if MODE_DRONE_SHOW_ENABLED == ENABLED
+    // also check whether we have breached the fence for long enough to
+    // warrant a motor shutdown. This must be called after fence_check()
+    // to ensure that the breaches have already been updated in the fence
+    // object
+    hard_fence_check();
+  #endif
 #endif // AP_FENCE_ENABLED
 
 

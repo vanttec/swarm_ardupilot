@@ -111,6 +111,7 @@ GRTAGS
 GTAGS
 *.apj
 .gdbinit
+/.venv
 /.vscode
 /.history
 Parameters.html

@@ -90,6 +90,10 @@
 #endif
 #include <AP_GPS/AP_GPS.h>
 
+#if HAVE_FILESYSTEM_SUPPORT
+  #include <AP_Filesystem/AP_Filesystem.h>
+#endif
+
 #include <ctype.h>
 
 extern const AP_HAL::HAL& hal;
@@ -993,6 +997,7 @@ ap_message GCS_MAVLINK::mavlink_id_to_ap_message_id(const uint32_t mavlink_id) c
 #if HAL_ADSB_ENABLED
         { MAVLINK_MSG_ID_UAVIONIX_ADSB_OUT_STATUS, MSG_UAVIONIX_ADSB_OUT_STATUS},
 #endif
+        { MAVLINK_MSG_ID_DATA16,                MSG_DRONE_SHOW_STATUS},
             };
 
     for (uint8_t i=0; i<ARRAY_SIZE(map); i++) {
@@ -1351,6 +1356,10 @@ void GCS_MAVLINK::update_send()
 #if HAL_MAVLINK_INTERVALS_FROM_FILES_ENABLED
         initialise_message_intervals_from_config_files();
 #endif
+
+        // allow further customization of message intervals in derived classes
+        initialise_custom_message_intervals();
+
         deferred_messages_initialised = true;
     }
 
