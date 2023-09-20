@@ -16,12 +16,13 @@
 # luminuousbee5 -- for LuminousBee5 outdoor
 # luminuousbee-mini2 -- for LuminousBee Mini indoor
 # QioTekZealotH743 -- donated to the Skybrush project
+# speedybeef4v3 -- with disabled OSD support to make the firmware fit
 # MatekH743, MatekH743-bdshot -- Matek H743 variants, without and with bidirectional DShot
 #
 # You may define the BOARDS= variable in the environment to override which
 # boards to build for.
 
-BOARDS=${BOARDS:-"sitl Pixhawk1 cmcopter CubeBlack CubeOrange entron300 fmuv3 fmuv4 fmuv5 Pixhawk4 PH4-mini Durandal luminousbee5 luminousbee-mini2 QioTekZealotH743 MatekH743 MatekH743-bdshot lightdynamix-pixel"}
+BOARDS=${BOARDS:-"sitl Pixhawk1 cmcopter CubeBlack CubeOrange entron300 fmuv3 fmuv4 fmuv5 Pixhawk4 PH4-mini Durandal luminousbee5 luminousbee-mini2 QioTekZealotH743 MatekH743 MatekH743-bdshot lightdynamix-pixel speedybeef4v3"}
 ARM_TOOLCHAIN=${ARM_TOOLCHAIN:-"${HOME}/opt/toolchains/ardupilot"}
 
 set -e
