@@ -12,18 +12,24 @@
 # Pixhawk4 -- for the Holybro Pixhawk 4 (fmuv5 with a few tweaks)
 # PH4-mini -- for the PixHawk 4 Mini
 # Durandal -- for the Holybro Durandal
+# lightdynamix-pixel -- for the Lightdynamix Pixel drone
 # luminuousbee5 -- for LuminousBee5 outdoor
 # luminuousbee-mini2 -- for LuminousBee Mini indoor
 # QioTekZealotH743 -- donated to the Skybrush project
-# MatekH743, MatekH743-bdshot -- Matel H743 variants, without and with bidirectional DShot
+# MatekH743, MatekH743-bdshot -- Matek H743 variants, without and with bidirectional DShot
 #
 # You may define the BOARDS= variable in the environment to override which
 # boards to build for.
 
-BOARDS=${BOARDS:-"sitl Pixhawk1 cmcopter CubeBlack CubeOrange entron300 fmuv3 fmuv4 fmuv5 Pixhawk4 PH4-mini Durandal luminousbee5 luminousbee-mini2 QioTekZealotH743 MatekH743 MatekH743-bdshot"}
+BOARDS=${BOARDS:-"sitl Pixhawk1 cmcopter CubeBlack CubeOrange entron300 fmuv3 fmuv4 fmuv5 Pixhawk4 PH4-mini Durandal luminousbee5 luminousbee-mini2 QioTekZealotH743 MatekH743 MatekH743-bdshot lightdynamix-pixel"}
 ARM_TOOLCHAIN=${ARM_TOOLCHAIN:-"${HOME}/opt/toolchains/ardupilot"}
 
 set -e
+
+# Declare that some of the boards are based on other boards so we can re-use
+# their bootloaders
+BASE_BOARD_OF_entron300=Pixhawk1
+BASE_BOARD_OF_lightdynamix_pixel=MatekH743-bdshot
 
 cd "`dirname $0`"
 
@@ -38,18 +44,18 @@ fi
 export PATH=".venv/bin:$PATH"
 if [ ! -d "${ARM_TOOLCHAIN}" ]; then
     echo "/!\\ ARM toolchain suggested by the ArduPilot developers is not installed."
-	while true; do
-		read -p "    Do you want to continue? [y/N] " yn
-		case $yn in
-			[Yy]* ) break;;
-			[Nn]* ) exit;;
-			* ) echo ""; echo "    Please respond with yes or no.";;
-		esac
-	done
+    while true; do
+        read -p "    Do you want to continue? [y/N] " yn
+        case $yn in
+            [Yy]* ) break;;
+            [Nn]* ) exit;;
+            * ) echo ""; echo "    Please respond with yes or no.";;
+        esac
+    done
 fi
 
 if [ -d "${ARM_TOOLCHAIN}" ]; then
-	export PATH="${ARM_TOOLCHAIN}/bin:$PATH"
+    export PATH="${ARM_TOOLCHAIN}/bin:$PATH"
 fi
 
 DATE=`date +%Y%m%d`
@@ -60,9 +66,20 @@ for BOARD in $BOARDS; do
     BOARD_LOWER=`echo $BOARD | tr [[:upper:]] [[:lower:]]`
 
     echo "Starting build for $BOARD..."
-	echo ""
+    echo ""
 
     rm -rf build/$BOARD
+
+    # If the board is based on another board, copy the bootloader
+    BASE_BOARD_VAR_NAME="BASE_BOARD_OF_`echo "${BOARD}" | sed -e 's/-/_/g'`"
+    BASE_BOARD=${!BASE_BOARD_VAR_NAME}
+    if [ x$BASE_BOARD != x ]; then
+        rm -f Tools/bootloaders/${BOARD}_bl.*
+        for fname in Tools/bootloaders/${BASE_BOARD}_bl.*; do
+            EXT="${fname##*.}"
+            cp $fname Tools/bootloaders/${BOARD}_bl.${EXT}
+        done
+    fi
 
     if [ x$BOARD = xcmcopter ]; then
         # The IOFMU code has to be rebuilt
@@ -83,8 +100,13 @@ for BOARD in $BOARDS; do
         git restore Tools/IO_Firmware/*.bin
     fi
 
-	echo "Finished build for $BOARD."
-	echo "====================================================================="
+    # If the board is based on another board, remove the copied bootloader
+    if [ x$BASE_BOARD != x ]; then
+        rm -f Tools/bootloaders/${BOARD}_bl.*
+    fi
+
+    echo "Finished build for $BOARD."
+    echo "====================================================================="
 done
 
 echo ""
