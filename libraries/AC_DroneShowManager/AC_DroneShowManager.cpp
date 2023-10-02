@@ -317,7 +317,7 @@ const AP_Param::GroupInfo AC_DroneShowManager::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("HFENCE_DIST", 21, AC_DroneShowManager, hard_fence._params.distance, 25),
 
-    // @Param: HFENCE_DLY
+    // @Param: HFENCE_TO
     // @DisplayName: Hard fence timeout
     // @Description: Minimum time that the vehicle needs to spend outside the hard geofence to trigger a motor shutdown
     // @Units: sec
