@@ -366,6 +366,7 @@ AC_DroneShowManager::AC_DroneShowManager() :
     _show_data(0),
     _trajectory_valid(false),
     _light_program_valid(false),
+    _yaw_control_valid(false),
     _stage_in_drone_show_mode(DroneShow_Off),
     _start_time_requested_by(StartTimeSource::NONE),
     _start_time_on_internal_clock_usec(0),
@@ -394,12 +395,24 @@ AC_DroneShowManager::AC_DroneShowManager() :
     _light_player = new sb_light_player_t;
     sb_light_player_init(_light_player, _light_program);
 
+    _yaw_control = new sb_yaw_control_t;
+    sb_yaw_control_init_empty(_yaw_control);
+
+    _yaw_player = new sb_yaw_player_t;
+    sb_yaw_player_init(_yaw_player, _yaw_control);
+
     // Don't call _update_rgb_led_instance() here, servo framework is not set
     // up yet
 }
 
 AC_DroneShowManager::~AC_DroneShowManager()
 {
+    sb_yaw_player_destroy(_yaw_player);
+    delete _yaw_player;
+
+    sb_yaw_control_destroy(_yaw_control);
+    delete _yaw_control;
+
     sb_light_player_destroy(_light_player);
     delete _light_player;
 
@@ -511,20 +524,64 @@ void AC_DroneShowManager::get_color_of_rgb_light_at_seconds(float time, sb_rgb_c
 }
 
 bool AC_DroneShowManager::get_current_guided_mode_command_to_send(
-    GuidedModeCommand& command, bool altitude_locked_above_takeoff_altitude
+    GuidedModeCommand& command,
+    int32_t default_yaw_cd,
+    bool altitude_locked_above_takeoff_altitude
 ) {
     Location loc;
+
     static uint8_t invalid_velocity_warning_sent = 0;
     static uint8_t invalid_acceleration_warning_sent = 0;
+    static uint8_t invalid_yaw_warning_sent = 0;
+    static uint8_t invalid_yaw_rate_warning_sent = 0;
     // static uint8_t counter = 0;
 
     float elapsed = get_elapsed_time_since_start_sec();
+    float yaw_cd = default_yaw_cd;
+    float yaw_rate_cds = 0;
     
     get_desired_global_position_at_seconds(elapsed, loc);
 
-    command.pos.zero();
-    command.vel.zero();
-    command.acc.zero();
+    command.clear();
+    command.yaw_cd = default_yaw_cd;
+
+    if (loaded_yaw_control_data_successfully())
+    {
+        // TODO(vasarhelyi): handle auto yaw mode as well
+
+        yaw_cd = get_desired_yaw_cd_at_seconds(elapsed) * 100.0f;
+
+        // Prevent invalid yaw information from leaking into the guided
+        // mode controller
+        if (isnan(yaw_cd) || isinf(yaw_cd))
+        {
+            if (!invalid_yaw_warning_sent)
+            {
+                gcs().send_text(MAV_SEVERITY_WARNING, "Invalid yaw command; not using yaw control");
+                invalid_yaw_warning_sent = true;
+            }
+        }
+        else
+        {
+            yaw_rate_cds = get_desired_yaw_rate_cds_at_seconds(elapsed);
+
+            // Prevent invalid yaw rate information from leaking into the guided
+            // mode controller
+            if (isnan(yaw_rate_cds) || isinf(yaw_rate_cds))
+            {
+                if (!invalid_yaw_rate_warning_sent)
+                {
+                    gcs().send_text(MAV_SEVERITY_WARNING, "Invalid yaw rate command; not using yaw control");
+                    invalid_yaw_rate_warning_sent = true;
+                }
+            }
+            else
+            {
+                command.yaw_cd = yaw_cd;
+                command.yaw_rate_cds = yaw_rate_cds;
+            }
+        }
+    }
 
     if (loc.get_vector_from_origin_NEU(command.pos))
     {
@@ -668,6 +725,22 @@ void AC_DroneShowManager::get_desired_acceleration_neu_in_cms_per_seconds_square
     acc.x = acc_north / 10.0f;
     acc.y = acc_east / 10.0f;
     acc.z = vec.z / 10.0f;
+}
+
+float AC_DroneShowManager::get_desired_yaw_cd_at_seconds(float time)
+{
+    float value;
+    sb_yaw_player_get_yaw_at(_yaw_player, time, &value);
+
+    return _show_coordinate_system.convert_show_to_global_yaw_and_scale_to_cd(value);
+}
+
+float AC_DroneShowManager::get_desired_yaw_rate_cds_at_seconds(float time)
+{
+    float value;
+    sb_yaw_player_get_yaw_rate_at(_yaw_player, time, &value);
+
+    return value * 100.0f; /* [deg] -> [cdeg] */
 }
 
 void AC_DroneShowManager::get_distance_from_desired_position(Vector3f& vec) const
@@ -964,6 +1037,11 @@ bool AC_DroneShowManager::loaded_show_data_successfully() const
     return _trajectory_valid;
 }
 
+bool AC_DroneShowManager::loaded_yaw_control_data_successfully() const
+{
+    return _yaw_control_valid;
+}
+
 void AC_DroneShowManager::notify_drone_show_mode_initialized()
 {
     _cancel_requested = false;
@@ -993,7 +1071,7 @@ void AC_DroneShowManager::notify_drone_show_mode_exited()
     _cancel_requested = false;
     _update_rgb_led_instance();
     _clear_start_time_if_set_by_switch();
-    _clear_last_setpoint();
+    _last_setpoint.clear();
 }
 
 void AC_DroneShowManager::notify_guided_mode_command_sent(const GuidedModeCommand& command)
@@ -1359,14 +1437,6 @@ void AC_DroneShowManager::_check_radio_failsafe()
         // of range, user changes the switch, then the drone reconnects)
         _rc_switches_blocked_until = AP_HAL::millis() + 1000;
     }
-}
-
-void AC_DroneShowManager::_clear_last_setpoint()
-{
-    _last_setpoint.acc.zero();
-    _last_setpoint.vel.zero();
-    _last_setpoint.pos.zero();
-    _last_setpoint.unlock_altitude = false;
 }
 
 void AC_DroneShowManager::_clear_start_time_after_landing()
@@ -1777,6 +1847,7 @@ bool AC_DroneShowManager::_load_show_file_from_storage()
     // Clear any previously loaded show
     _set_light_program_and_take_ownership(0);
     _set_trajectory_and_take_ownership(0);
+    _set_yaw_control_and_take_ownership(0);
     _set_show_data_and_take_ownership(0);
 
     // Check whether the show file exists
@@ -1860,11 +1931,12 @@ bool AC_DroneShowManager::_load_show_file_from_storage()
         AP::FS().close(fd);
     }
 
-    // Parse the show file and find the trajectory and the light program in it
+    // Parse the show file and find the trajectory, light program and yaw control data in it
     if (show_data)
     {
         sb_trajectory_t loaded_trajectory;
         sb_light_program_t loaded_light_program;
+        sb_yaw_control_t loaded_yaw_control;
 
         _set_show_data_and_take_ownership(show_data);
 
@@ -1907,6 +1979,23 @@ bool AC_DroneShowManager::_load_show_file_from_storage()
         {
             _set_light_program_and_take_ownership(&loaded_light_program);
         }
+
+        retval = sb_yaw_control_init_from_binary_file_in_memory(&loaded_yaw_control, show_data, stat_data.st_size);
+        if (retval == SB_ENOENT)
+        {
+            // No yaw control in show file, this is okay, we just create an
+            // empty one
+            _set_yaw_control_and_take_ownership(0);
+        }
+        else if (retval)
+        {
+            hal.console->printf("Error while parsing show file: %d\n", (int) retval);
+        }
+        else
+        {
+            _set_yaw_control_and_take_ownership(&loaded_yaw_control);
+        }
+
     }
 
     return success;
@@ -2010,6 +2099,25 @@ void AC_DroneShowManager::_set_trajectory_and_take_ownership(sb_trajectory_t *va
     sb_trajectory_player_init(_trajectory_player, _trajectory);
 
     _recalculate_trajectory_properties();
+}
+
+void AC_DroneShowManager::_set_yaw_control_and_take_ownership(sb_yaw_control_t *value)
+{
+    sb_yaw_player_destroy(_yaw_player);
+    sb_yaw_control_destroy(_yaw_control);
+
+    if (value)
+    {
+        *_yaw_control = *value;
+        _yaw_control_valid = true;
+    }
+    else
+    {
+        sb_yaw_control_init_empty(_yaw_control);
+        _yaw_control_valid = false;
+    }
+
+    sb_yaw_player_init(_yaw_player, _yaw_control);
 }
 
 void AC_DroneShowManager::_update_preflight_check_result(bool force)
@@ -2444,6 +2552,14 @@ void AC_DroneShowManager::ShowCoordinateSystem::clear()
     origin_lat = origin_lng = origin_amsl_mm = 0;
     orientation_rad = 0;
     origin_amsl_valid = false;
+}
+
+float AC_DroneShowManager::ShowCoordinateSystem::convert_show_to_global_yaw_and_scale_to_cd(
+    float yaw
+) const {
+    // show coordinates are in degrees relative to X axis orientation,
+    // we need centidegrees relative to North
+    return (degrees(orientation_rad) + yaw) * 100.0f;
 }
 
 void AC_DroneShowManager::ShowCoordinateSystem::convert_show_to_global_coordinate(

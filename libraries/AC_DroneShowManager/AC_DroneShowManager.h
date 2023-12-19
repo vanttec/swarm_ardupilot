@@ -20,6 +20,9 @@ struct sb_trajectory_player_s;
 struct sb_light_program_s;
 struct sb_light_player_s;
 
+struct sb_yaw_control_s;
+struct sb_yaw_player_s;
+
 class DroneShowLEDFactory;
 class DroneShowLED;
 
@@ -122,6 +125,10 @@ private:
         // the global GPS coordinate system
         void convert_show_to_global_coordinate(sb_vector3_with_yaw_t vec, Location& loc) const;
 
+        // Converts a yaw angle given in the show coordinate system, in degrees, to
+        // centidegrees relative to north
+        float convert_show_to_global_yaw_and_scale_to_cd(float value) const;
+
         // Returns whether the coordinate system is valid.
         bool is_valid() const { return origin_lat != 0 && origin_lng != 0; };
     };
@@ -149,6 +156,17 @@ public:
         Vector3f vel;
         Vector3f acc;
         bool unlock_altitude;
+        float yaw_cd;
+        float yaw_rate_cds;
+
+        void clear() {
+            pos.zero();
+            vel.zero();
+            acc.zero();
+            unlock_altitude = false;
+            yaw_cd = 0.0f;
+            yaw_rate_cds = 0.0f;
+        }
     };
 
     // Early initialization steps that have to be called early in the boot process
@@ -201,6 +219,7 @@ public:
     // when the function is invoked
     bool get_current_guided_mode_command_to_send(
         GuidedModeCommand& command,
+        int32_t default_yaw_cd,
         bool altitude_locked_above_takeoff_altitude = false
     ) WARN_IF_UNUSED;
 
@@ -225,6 +244,15 @@ public:
     // given number of seconds after the start time, in the global NEU
     // cooordinate system, using centimeters per seconds squared as units.
     void get_desired_acceleration_neu_in_cms_per_seconds_squared_at_seconds(float time, Vector3f& acc);
+
+    // Returns the desired yaw of the drone during the drone show the
+    // given number of seconds after the start time, in centidegrees 
+    // relative to North.
+    float get_desired_yaw_cd_at_seconds(float time);
+
+    // Returns the desired yaw rate of the drone during the drone show the
+    // given number of seconds after the start time, in centidegrees/seconds.
+    float get_desired_yaw_rate_cds_at_seconds(float time);
 
     // Returns the distance of the drone from its desired position during the
     // "Performing" stage of the show. Returns zero distance when not doing a show.
@@ -373,6 +401,9 @@ public:
 
     // Returns whether a show file was identified and loaded at boot time
     bool loaded_show_data_successfully() const;
+
+    // Returns whether yaw control was loaded from the show file at boot time
+    bool loaded_yaw_control_data_successfully() const;
 
     // Returns whether the drone matches the given group mask
     bool matches_group_mask(uint8_t mask) const {
@@ -560,6 +591,10 @@ private:
     struct sb_light_player_s* _light_player;
     bool _light_program_valid;
 
+    struct sb_yaw_control_s* _yaw_control;
+    struct sb_yaw_player_s* _yaw_player;
+    bool _yaw_control_valid;
+
     // Result of the drone show specific preflight checks. Updated periodically
     // from _update_preflight_check_result(). See the values from the
     // DroneShowPreflightCheckFlag enum for more details.
@@ -672,9 +707,6 @@ private:
     // has passed
     void _check_radio_failsafe();
 
-    // Clears the stored last setpoint that was sent to the drone
-    void _clear_last_setpoint();
-
     // Clears the start time of the drone show after a successful landing
     void _clear_start_time_after_landing();
 
@@ -757,6 +789,7 @@ private:
     void _set_light_program_and_take_ownership(struct sb_light_program_s *value);
     void _set_trajectory_and_take_ownership(struct sb_trajectory_s *value);
     void _set_show_data_and_take_ownership(uint8_t *value);
+    void _set_yaw_control_and_take_ownership(struct sb_yaw_control_s *value);
 
     // Updates the state of the LED light on the drone. This has to be called
     // regularly at 25 Hz

@@ -106,6 +106,11 @@ bool ModeDroneShow::do_user_takeoff_start(float takeoff_alt_cm)
     }
 }
 
+int32_t ModeDroneShow::get_default_yaw_cd() const
+{
+    return copter.initial_armed_bearing;
+}
+
 int32_t ModeDroneShow::get_elapsed_time_since_last_home_position_reset_attempt_msec() const
 {
     return AP_HAL::millis() - _last_home_position_reset_attempt_at;
@@ -523,7 +528,7 @@ void ModeDroneShow::takeoff_start()
     // input of the pilot will override this in auto_takeoff_run() if an RC is
     // connected and pilot yaw input in guided mode is allowed.
     auto_yaw.set_fixed_yaw(
-        copter.initial_armed_bearing * 0.01f,  /* [cd] -> [deg] */
+        get_default_yaw_cd() * 0.01f,  /* [cd] -> [deg] */
         /* turn_rate_dps = */ 0, /* direction = */ 0, /* relative_angle = */ 0
     );
 
@@ -897,12 +902,15 @@ bool ModeDroneShow::send_guided_mode_command_during_performance()
     AC_DroneShowManager::GuidedModeCommand command;
 
     if (copter.g2.drone_show_manager.get_current_guided_mode_command_to_send(
-        command, _altitude_locked_above_takeoff_altitude
+        command, get_default_yaw_cd(),
+        _altitude_locked_above_takeoff_altitude
     )) {
         copter.mode_guided.set_destination_posvelaccel(
             command.pos, command.vel, command.acc,
             /* use_yaw = */ true,
-            copter.initial_armed_bearing /* [cd] */
+            command.yaw_cd, /* [cd] */
+            /* use_yaw_rate = */ true,
+            command.yaw_rate_cds  /* [cd/s] */
         );
 
         if (command.unlock_altitude) {
