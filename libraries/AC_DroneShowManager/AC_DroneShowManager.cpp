@@ -549,7 +549,7 @@ bool AC_DroneShowManager::get_current_guided_mode_command_to_send(
     {
         // TODO(vasarhelyi): handle auto yaw mode as well
 
-        yaw_cd = get_desired_yaw_cd_at_seconds(elapsed) * 100.0f;
+        yaw_cd = get_desired_yaw_cd_at_seconds(elapsed);
 
         // Prevent invalid yaw information from leaking into the guided
         // mode controller
