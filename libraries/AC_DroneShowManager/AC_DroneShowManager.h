@@ -648,7 +648,8 @@ private:
         LightEffectPriority priority;   //< Priority of the signal
         uint16_t period_msec;           //< Period of the light signal when applicable
         uint16_t phase_msec;            //< Phase of the light signal when applicable
-        uint8_t enhance_brightness;     //< Whether to enhance the brightness using the W LED if possible
+        bool enhance_brightness;        //< Whether to enhance the brightness using the W LED if possible
+        bool sync_to_gps;               //< Whether to sync the light signal to GPS time
     } _light_signal;
 
     // Current execution stage of the drone show mode. This is pushed here from

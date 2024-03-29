@@ -88,7 +88,8 @@ void AC_DroneShowManager::_flash_leds_with_color(
     _light_signal.color[2] = blue;
     _light_signal.effect = LightEffect_Blinking;
     _light_signal.period_msec = 300;  /* 100ms on, 200ms off */
-    _light_signal.phase_msec = 0;     /* exact sync with GPS clock */
+    _light_signal.phase_msec = 0;
+    _light_signal.sync_to_gps = true;
 }
 
 bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& msg)
@@ -141,6 +142,11 @@ bool AC_DroneShowManager::_handle_led_control_message(const mavlink_message_t& m
     _light_signal.started_at_msec = AP_HAL::millis();
     _light_signal.priority = priority;
     _light_signal.enhance_brightness = false;
+
+    // Sync the light signal to GPS time when it is broadcast so all drones would
+    // flash at the same time. However, when this is an individual command,
+    // start the flash as soon as possible for responsiveness.
+    _light_signal.sync_to_gps = (packet.target_system == 0);
 
     if (packet.custom_len < 2) {
         // Start blinking the drone show LED
@@ -282,7 +288,9 @@ void AC_DroneShowManager::_update_lights()
             } else {
                 // Light signal is in progress
                 factor = get_modulation_factor_for_light_effect(
-                    _get_gps_synced_timestamp_in_millis_for_lights(),
+                    _light_signal.sync_to_gps
+                        ? _get_gps_synced_timestamp_in_millis_for_lights()
+                        : diff,
                     _light_signal.effect, _light_signal.period_msec,
                     _light_signal.phase_msec
                 );
