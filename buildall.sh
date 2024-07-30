@@ -2,6 +2,8 @@
 #
 # Helper script to build ArduCopter for multiple FMUs
 # 
+# Officially supported configurations:
+#
 # sitl -- Software-in-the-loop simulator
 # Pixhawk1 -- general Pixhawk1-based drones
 # cmcopter -- for our own drones, which need a hack in the parsing of the PPMSum signals
@@ -20,10 +22,14 @@
 # speedybeef4v3 -- with disabled OSD support to make the firmware fit
 # MatekH743, MatekH743-bdshot -- Matek H743 variants, without and with bidirectional DShot
 #
+# These variants are built but they are not officially supported:
+#
+# Pixhawk6C -- for the Holybro Pixhawk 6C and 6C Mini
+#
 # You may define the BOARDS= variable in the environment to override which
 # boards to build for.
 
-BOARDS=${BOARDS:-"sitl Pixhawk1 cmcopter CubeBlack CubeOrange CubeOrangePlus entron300 fmuv3 fmuv4 fmuv5 Pixhawk4 PH4-mini Durandal luminousbee5 luminousbee-mini2 QioTekZealotH743 MatekH743 MatekH743-bdshot lightdynamix-pixel speedybeef4v3"}
+BOARDS=${BOARDS:-"sitl Pixhawk1 cmcopter CubeBlack CubeOrange CubeOrangePlus entron300 fmuv3 fmuv4 fmuv5 Pixhawk4 Pixhawk6C PH4-mini Durandal luminousbee5 luminousbee-mini2 QioTekZealotH743 MatekH743 MatekH743-bdshot lightdynamix-pixel speedybeef4v3"}
 ARM_TOOLCHAIN=${ARM_TOOLCHAIN:-"${HOME}/opt/toolchains/ardupilot"}
 
 set -e
